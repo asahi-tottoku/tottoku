@@ -280,6 +280,26 @@
     return hit ? hit.w : "";
   }
 
+  // 地域の欄の言葉を、市区町村ごとにまとめた名前にする(地域で絞り込む欄に使う)。
+  // 「六本木」→「港区」、「御殿場市」「御殿場・裾野」→「御殿場」、「横浜市中区」→「横浜」。分からなければ ""
+  const groupCache = new Map();
+  function areaGroup(text) {
+    const s = String(text || "");
+    if (!s) return "";
+    if (groupCache.has(s)) return groupCache.get(s);
+    let out = "";
+    const w = detectPlace(s);
+    if (w) {
+      const t = fnorm(w);
+      for (const [key, ms] of Object.entries(AREAS)) {
+        if (fnorm(key) === t || fnorm(bare(key)) === t || ms.some((m) => fnorm(m) === t)) { out = bare(key); break; }
+      }
+      out = out || w;
+    }
+    groupCache.set(s, out);
+    return out;
+  }
+
   // 座標から、いちばん近い市区町村の名前(「御殿場市」「港区」「横浜市中区」)。表が無いか、25km より遠ければ ""
   function placeFromCoords(lat, lng) {
     if (!PLACES.length || lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return "";
@@ -336,7 +356,7 @@
   }
 
   const api = { fnorm, GENRES, AREAS, NEIGHBORS, resolveToken, splitName, folderMatch, itemTexts, pickFolder,
-    detectGenres, detectPlace, urlHints, placeFromCoords };
+    detectGenres, detectPlace, urlHints, placeFromCoords, areaGroup };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Sorter = api;
 })(typeof self !== "undefined" ? self : this);

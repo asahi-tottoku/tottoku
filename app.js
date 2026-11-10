@@ -495,6 +495,29 @@ function renderGenres() {
   box.hidden = false;
 }
 
+// ---------------------------------------------------------------- 地域で絞り込む(自動で選択肢を作る)
+// お店の「地域」(無ければ住所)を市区町村ごとにまとめ、多い順に並べる。地域が分からないものは「地域なし」。
+const areaOf = (i) => Sorter.areaGroup(i.area) || Sorter.areaGroup(i.address) || "";
+function renderAreas() {
+  const sel = $("#areaSel");
+  const cur = sel.value;
+  const q = filterQ();
+  const base = items.filter((i) => inFolder(i) && matches(i, q) && (!activeGenre || genreOf(i) === activeGenre));
+  const count = new Map();
+  base.forEach((i) => { const a = areaOf(i); count.set(a, (count.get(a) || 0) + 1); });
+  const named = [...count].filter(([a]) => a).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "ja"));
+  const opts = [["all", `📍 地域: すべて (${base.length})`], ...named.map(([a, n]) => [a, `📍 ${a} (${n})`])];
+  if (count.has("")) opts.push(["none", `地域なし (${count.get("")})`]);
+  sel.innerHTML = "";
+  opts.forEach(([v, label]) => { const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o); });
+  sel.value = opts.some(([v]) => v === cur) ? cur : "all";
+}
+function inArea(i) {
+  const a = $("#areaSel").value;
+  if (a === "all") return true;
+  return a === "none" ? !areaOf(i) : areaOf(i) === a;
+}
+
 // ---------------------------------------------------------------- 一覧
 function inFolder(i) {
   if (activeFolder === "all") return true;
@@ -520,7 +543,7 @@ const filterQ = () => (searchMode === "web" ? "" : searchText());
 
 function currentList() {
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q) && (!activeGenre || genreOf(i) === activeGenre));
+  const base = items.filter((i) => inFolder(i) && matches(i, q) && (!activeGenre || genreOf(i) === activeGenre) && inArea(i));
   const vf = $("#visitSel").value;
   let list = base.filter((i) =>
     (vf === "all" || (vf === "went" ? i.visited_at : !i.visited_at)));
@@ -540,6 +563,7 @@ function currentList() {
 function render() {
   renderFolders();
   renderGenres();
+  renderAreas();
   renderRemind();
   const list = currentList();
   document.querySelectorAll("#viewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
@@ -814,6 +838,7 @@ $("#searchSeg").querySelectorAll("button").forEach((b) => { b.onclick = () => { 
 $("#searchSeg").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.mode === searchMode));
 if (searchMode === "web") $("#filterInput").placeholder = "🌐 Webで探す 例:御殿場 焼肉 個室";
 $("#visitSel").onchange = () => { setPref("visit", $("#visitSel").value); render(); };
+$("#areaSel").onchange = render;
 $("#sortSel").onchange = async () => {
   setPref("sort", $("#sortSel").value);
   if ($("#sortSel").value === "near" && !myPos) {
