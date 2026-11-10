@@ -264,9 +264,13 @@ function offerAutosort() {
       confirm("保存済みのものを、自動でフォルダに振り分け直しますか?\n(自分で選んだものは動かしません)")) runAutosort();
 }
 
-// フォルダ選択ダイアログ
-function openMove(item) {
+// フォルダ選択ダイアログ。ask: 保存した直後に「自動では決められなかった」ときに出す
+function openMove(item, ask = false) {
   const dlg = $("#moveDlg");
+  const head = dlg.querySelector(".sheet-title");
+  head.textContent = ask ? "自動では決められませんでした。\nどこに入れますか?" : "フォルダを選ぶ";
+  head.style.whiteSpace = "pre-line";
+  $("#moveCancel").textContent = ask ? "あとで" : "閉じる";
   $("#moveName").textContent = item.title || item.url;
   const list = $("#moveList");
   list.innerHTML = "";
@@ -282,7 +286,7 @@ function openMove(item) {
     };
     list.appendChild(b);
   };
-  opt("🗂 自動で選ぶ", "auto", !item.folder_manual, "地名とジャンルで選びます");
+  if (!ask) opt("🗂 自動で選ぶ", "auto", !item.folder_manual, "地名とジャンルで選びます");
   folders.forEach((f) => opt("📁 " + f.name, f.id, item.folder_manual && item.folder_id === f.id));
   opt("フォルダなし", null, item.folder_manual && !folderName(item.folder_id));
   $("#moveNew").onclick = async () => {
@@ -727,13 +731,20 @@ async function saveItem(v, fid) {
   $("#addInput").value = "";
   try {
     const res = await api("/api/items", { method: "POST", body });
-    await load();
-    const it = items.find((x) => x.id === res.id);
-    const where = it && folderName(it.folder_id);
-    toast(where ? `「${where}」に保存しました` : "保存しました");
+    await afterSave(res.id, fid == null);
   } catch (err) {
     toast("保存できませんでした");
   }
+}
+
+// 保存のあと: 入ったフォルダを知らせる。自動で決まらなかったら、どこに入れるかその場で聞く
+// (選んだものは「自分で選んだ」になり、同じ名前・同じチェーンの店を次から同じフォルダに入れる)
+async function afterSave(id, auto) {
+  await load();
+  const it = items.find((x) => x.id === id);
+  const where = it && folderName(it.folder_id);
+  if (it && !where && auto && folders.length) { openMove(it, true); return; }
+  toast(where ? `「${where}」に保存しました` : "とっとくに保存しました");
 }
 
 // ---------------------------------------------------------------- Webで探す(AIなし: 同じ言葉でほかのサイトを開くだけ)
@@ -911,10 +922,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").ca
     history.replaceState(null, "", location.pathname);
     const res = await api("/api/items", { method: "POST",
       body: { url: p.get("url") || "", text: p.get("text") || "", title: p.get("title") || "" } });
-    await load();
-    const it = items.find((x) => x.id === res.id);
-    const where = it && folderName(it.folder_id);
-    toast(where ? `「${where}」に保存しました` : "とっとくに保存しました");
+    await afterSave(res.id, true);
   } else {
     await load();
   }

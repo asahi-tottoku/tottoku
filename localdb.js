@@ -75,11 +75,12 @@
   }
 
   function categoryOf(h, url, genres) {
-    if (genres.length || /tabelog|hotpepper|retty|gnavi|ikyu|hitosara/.test(h)) return "飲食店";
-    if (/google\./.test(h) && /\/maps|maps\.app/.test(url) || /maps\.app\.goo\.gl/.test(h)) return "お出かけ";
+    // 買い物・動画・レシピのサイトは、ジャンルの言葉があってもそちらを優先する
     if (/amazon|rakuten|yahoo|mercari/.test(h)) return "買い物";
     if (/youtube|youtu\.be|tiktok/.test(h)) return "動画";
     if (/cookpad|kurashiru|delishkitchen/.test(h)) return "レシピ";
+    if (genres.length || /tabelog|hotpepper|retty|gnavi|ikyu|hitosara/.test(h)) return "飲食店";
+    if (/google\./.test(h) && /\/maps|maps\.app/.test(url) || /maps\.app\.goo\.gl/.test(h)) return "お出かけ";
     return "その他";
   }
 
@@ -92,20 +93,37 @@
     const title = cleanTitle(lines[0] || mi.name || "") || h || it.url || "(名前なし)";
     const desc = lines.join(" ").slice(0, 300);
     const all = [title, desc, mi.name || ""].join(" ");
-    const tags = S.detectGenres(all).slice(0, 6);
+    const hint = S.urlHints(it.url);   // 公式サイトのローマ字・食べログの地域番号
+    const tags = [...new Set([...S.detectGenres(all), ...hint.genres])].slice(0, 6);
     Object.assign(it, {
       title, description: desc, site: h,
-      area: S.detectPlace(all), tags,
+      area: S.detectPlace(all) || hint.place, tags,
       category: categoryOf(h, it.url, tags),
       lat: mi.lat ?? null, lng: mi.lng ?? null, status: "done",
     });
+  }
+
+  // 支店名を外した名前。「すしざんまい匠 六本木ラピロス店」→「すしざんまい匠」、「blueberry御殿場店」→「blueberry」
+  function chainKey(title) {
+    let s = String(title || "").normalize("NFKC").trim().replace(/\s*\([^)]*\)\s*$/, "");
+    if (/店$/.test(s)) {
+      const parts = s.split(/\s+/);
+      if (parts.length > 1) s = parts.slice(0, -1).join(" ");
+      else {
+        const p = S.detectPlace(s), i = p ? s.lastIndexOf(p) : -1;
+        if (i >= 2) s = s.slice(0, i);
+      }
+    }
+    const k = norm(s);
+    return k.length >= 2 ? k : "";
   }
 
   // ---------------------------------------------------------------- フォルダの振り分け(PC版の assign_folders と同じ順番)
   // 1. 同じ名前のお店を自分でフォルダに入れていれば、それに合わせる
   // 2. 辞書(地名・ジャンルの同義語)で決める
   // 3. 新しく保存したものが辞書で決まらず、同じ名前のお店がどこかのフォルダにあれば、それに合わせる
-  // 決まらなかったものは、今のフォルダのまま動かさない
+  // 4. (Web版だけ)それでも決まらず、同じチェーンの別の店がフォルダにあれば、それに合わせる(自分で選んだものを先に)
+  // 決まらなかったものは、今のフォルダのまま動かさない(新しく保存したときは、画面がどこに入れるか聞く)
   function assignFolders(ids = null, newItem = false) {
     const fl = sortedFolders();
     if (!fl.length) return 0;
@@ -131,6 +149,12 @@
           const ids2 = new Set(rows.map((r) => r.id));
           const others = same.filter((r) => !ids2.has(r.id));
           fid = others.length ? others[0].folder_id : null;
+          const ck = fid == null ? chainKey(rows[0].title) : "";
+          if (ck) {
+            const chain = all.filter((r) => !ids2.has(r.id) && fids.has(r.folder_id) && chainKey(r.title) === ck)
+              .sort((a, b) => (b.folder_manual || 0) - (a.folder_manual || 0));
+            if (chain.length) fid = chain[0].folder_id;
+          }
         }
       }
       if (fid == null) continue;
@@ -264,5 +288,5 @@
   }
 
   root.LocalAPI = { request, exportData, importData, saveState, loadState, CATEGORIES,
-    _organize: organize, _cleanTitle: cleanTitle };
+    _organize: organize, _cleanTitle: cleanTitle, _chainKey: chainKey };
 })(self);
