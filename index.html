@@ -65,16 +65,10 @@
       <button data-view="list">☰ 一覧</button>
       <button data-view="map">🗺 地図</button>
     </div>
-    <select id="visitSel" aria-label="行ったかどうか">
-      <option value="all">すべて</option>
-      <option value="want">行きたい</option>
-      <option value="went">行った</option>
-    </select>
-    <select id="areaSel" aria-label="地域"><option value="all">📍 地域: すべて</option></select>
+    <select id="areaSel" aria-label="地域"><option value="all">📍 全地域</option></select>
     <select id="sortSel" aria-label="並べ方">
       <option value="new">新しい順</option>
       <option value="near">近い順</option>
-      <option value="rating">評価順</option>
     </select>
   </div>
 
@@ -173,7 +167,6 @@
       <p class="note"></p>
       <div class="actions main-actions">
         <a class="act-reserve" target="_blank" rel="noopener" hidden>📅 ネット予約</a>
-        <button class="act-visit">✅ 行った</button>
         <button class="act-map" hidden>地図</button>
         <button class="act-share">送る</button>
       </div>

@@ -220,7 +220,7 @@ form button[type=submit] { background: var(--accent); color: var(--on-accent); b
 
 /* ---------- 一覧/地図の切り替え・並べ方 ---------- */
 .viewbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
-#areaSel { order: 9; flex: 1 1 100%; }
+#areaSel { flex: 1 1 0; }
 .viewbar select { font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
   border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-width: 0; }
 .seg-sm { flex: none; width: auto; grid-template-columns: repeat(2, auto); }

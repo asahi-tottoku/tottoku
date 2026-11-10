@@ -506,7 +506,7 @@ function renderAreas() {
   const count = new Map();
   base.forEach((i) => { const a = areaOf(i); count.set(a, (count.get(a) || 0) + 1); });
   const named = [...count].filter(([a]) => a).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "ja"));
-  const opts = [["all", `📍 地域: すべて (${base.length})`], ...named.map(([a, n]) => [a, `📍 ${a} (${n})`])];
+  const opts = [["all", "📍 全地域"], ...named.map(([a, n]) => [a, `📍 ${a} (${n})`])];
   if (count.has("")) opts.push(["none", `地域なし (${count.get("")})`]);
   sel.innerHTML = "";
   opts.forEach(([v, label]) => { const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o); });
@@ -544,15 +544,8 @@ const filterQ = () => (searchMode === "web" ? "" : searchText());
 function currentList() {
   const q = filterQ();
   const base = items.filter((i) => inFolder(i) && matches(i, q) && (!activeGenre || genreOf(i) === activeGenre) && inArea(i));
-  const vf = $("#visitSel").value;
-  let list = base.filter((i) =>
-    (vf === "all" || (vf === "went" ? i.visited_at : !i.visited_at)));
-  const sort = $("#sortSel").value;
-  if (sort === "near") {
-    list.sort((a, b) => (distKm(a) ?? 1e9) - (distKm(b) ?? 1e9));
-  } else if (sort === "rating") {
-    list.sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.visited_at ? 1 : 0) - (a.visited_at ? 1 : 0));
-  }
+  let list = base;
+  if ($("#sortSel").value === "near") list.sort((a, b) => (distKm(a) ?? 1e9) - (distKm(b) ?? 1e9));
   if (hitIds) {
     const rank = new Map(hitIds.map((id, n) => [id, n]));
     list = items.filter((i) => rank.has(i.id)).sort((a, b) => rank.get(a.id) - rank.get(b.id));
@@ -564,7 +557,6 @@ function render() {
   renderFolders();
   renderGenres();
   renderAreas();
-  renderRemind();
   const list = currentList();
   document.querySelectorAll("#viewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
   $("#empty").hidden = items.length > 0;
@@ -608,7 +600,6 @@ function card(i) {
   const link = i.url || "#";
   if (i.status === "processing") el.classList.add("processing");
   if (hitIds) el.classList.add("hit");
-  if (i.visited_at) el.classList.add("visited");
   const th = el.querySelector(".thumb");
   th.href = link;
   const noimg = () => { th.classList.add("noimg"); th.textContent = ICONS[i.category] || "🔖"; };
@@ -635,11 +626,6 @@ function card(i) {
     ft.onclick = () => openMove(i);
   } else ft.remove();
 
-  const v = el.querySelector(".visit");
-  if (i.visited_at) {
-    v.innerHTML = `✅ ${fmtDate(i.visited_at)}に行った ${i.rating ? `<span class="stars-view">${stars(i.rating)}</span>` : ""}` +
-      (i.review ? `<span class="review">「${escapeHtml(i.review)}」</span>` : "");
-  }
   el.querySelector(".who").textContent = i.recommender ? `👤 ${i.recommender}のおすすめ` : "";
 
   const si = el.querySelector(".shopinfo");
@@ -675,9 +661,6 @@ function card(i) {
     rsv.title = "予約ページを開く(" + site + ")";
     if (site.includes("tabelog")) rsv.textContent = "📅 ネット予約(食べログ)";
   }
-  const vb = el.querySelector(".act-visit");
-  if (i.visited_at) { vb.textContent = "✏ 記録"; vb.classList.add("done"); }
-  vb.onclick = () => openVisit(i);
   el.querySelector(".act-share").onclick = () => shareItem(i);
   const mapBtn = el.querySelector(".act-map");
   if (i.category === "飲食店" || i.category === "お出かけ" || i.lat) {
@@ -731,8 +714,8 @@ async function renderMap(list) {
   const pts = [];
   const placed = list.filter((i) => i.lat != null);
   placed.forEach((i) => {
-    const icon = L.divIcon({ className: "pin" + (i.visited_at ? " pin-went" : ""),
-      html: `<span>${i.visited_at ? "✓" : ICONS[i.category] || "•"}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+    const icon = L.divIcon({ className: "pin",
+      html: `<span>${ICONS[i.category] || "•"}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] });
     const d = distKm(i);
     const html = `<b>${escapeHtml(i.title)}</b><br><small>${escapeHtml(i.area || "")}${d != null ? " · " + fmtKm(d) : ""}</small>` +
       (todayHours(i) ? `<br><small>${escapeHtml(todayHours(i))}</small>` : "") +
@@ -837,7 +820,6 @@ function setSearchMode(m) {
 $("#searchSeg").querySelectorAll("button").forEach((b) => { b.onclick = () => { setSearchMode(b.dataset.mode); $("#filterInput").focus(); }; });
 $("#searchSeg").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.mode === searchMode));
 if (searchMode === "web") $("#filterInput").placeholder = "🌐 Webで探す 例:御殿場 焼肉 個室";
-$("#visitSel").onchange = () => { setPref("visit", $("#visitSel").value); render(); };
 $("#areaSel").onchange = render;
 $("#sortSel").onchange = async () => {
   setPref("sort", $("#sortSel").value);
@@ -969,8 +951,8 @@ $("#settingsClose").onclick = () => $("#settingsDlg").close();
 applyLook(getLook());
 
 // ---------------------------------------------------------------- 起動
-$("#visitSel").value = getPref("visit", "all");
 $("#sortSel").value = getPref("sort", "new");
+if (!$("#sortSel").value) $("#sortSel").value = "new";   // 前に「評価順」を選んでいた人
 view = getPref("view", "list");
 if ($("#sortSel").value === "near") getPos().then(() => render());
 
