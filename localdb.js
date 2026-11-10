@@ -31,6 +31,13 @@
     });
     db.close();
     if (!mem) mem = { items: [], folders: [], nextItem: 1, nextFolder: 1 };
+    for (const it of mem.items) {   // 辞書が増えたとき用: 名前から分かるジャンルをタグに足す
+      const add = S.detectGenres(it.title || "").filter((g) => !(it.tags || []).includes(g));
+      if (add.length) {
+        it.tags = [...(it.tags || []), ...add].slice(0, 8);
+        if (it.category === "その他") it.category = "飲食店";
+      }
+    }
     return mem;
   }
 

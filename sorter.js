@@ -181,17 +181,30 @@
   const splitName = (name) => String(name || "").normalize("NFKC").split(/[\s/・,、&＆+＋]+/).filter(Boolean);
 
   // フォルダ名の言葉が全部合えば [言葉の数, 子ジャンルの数] を返す。合わなければ null
+  // Web版(全国の表があるとき)は、フォルダ名のジャンルどうしは「どれか1つ」に合えばよい。
+  //   「ラーメン うどん 蕎麦」= ラーメンか蕎麦(うどん)の店。「御殿場 焼肉」= 御殿場の、焼肉の店(地名とジャンルは両方)。
+  //   ジャンルはまとめて1語と数える(「御殿場 焼肉」と同じ強さ)。
+  // PC版(表が無いとき)は今までどおり、全部の言葉に合うこと。
   function folderMatch(name, genreText, placeText) {
     const tokens = splitName(name);
     if (!tokens.length) return null;
-    let child = 0;
+    const anyGenre = NATIONAL.size > 0;
+    let child = 0, n = 0, genreSeen = false, genreHit = false;
     for (const tok of tokens) {
       const [kind, pats, parent] = resolveToken(tok);
       const text = kind === "place" ? placeText : genreText + " " + placeText;
-      if (!pats.some((p) => new RegExp(p).test(text))) return null;
+      const ok = pats.some((p) => new RegExp(p).test(text));
+      if (anyGenre && kind === "genre") {
+        genreSeen = true;
+        if (ok) { genreHit = true; if (parent) child++; }
+        continue;
+      }
+      if (!ok) return null;
+      n++;
       if (kind === "genre" && parent) child++;
     }
-    return [tokens.length, child];
+    if (genreSeen) { if (!genreHit) return null; n++; }
+    return [n, child];
   }
 
   // アイテムから、ジャンルを見る文と地名を見る文を作る。
@@ -228,9 +241,12 @@
 
   // ---------------------------------------------------------------- 保存するときの手がかり(Web版だけで使う)
   // 文の中から、辞書にあるジャンルの名前を全部返す(タグにする)
+  // 店名などの英字(「Wine&Pasta」「Cafe」)も、URL と同じローマ字の表で見る
   function detectGenres(text) {
     const t = fnorm(text);
-    return Object.entries(GENRES).filter(([name, [words]]) => [...words, name].some((w) => t.includes(fnorm(w))))
+    const latin = t.replace(/[^a-z]+/g, " ");
+    return Object.entries(GENRES).filter(([name, [words]]) => [...words, name].some((w) => t.includes(fnorm(w))) ||
+      (URL_GENRES[name] || []).some((w) => latin.includes(w)))
       .map(([name]) => name);
   }
 

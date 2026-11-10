@@ -469,7 +469,10 @@ const GENRE_NAMES = new Set(Object.keys(Sorter.GENRES));
 function genreOf(i) {
   const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
   if (t) return t;
-  return Sorter.detectGenres([i.title, ...(i.tags || []), i.summary, i.description].join(" "))[0] || "その他";
+  const d = Sorter.detectGenres([i.title, ...(i.tags || []), i.summary, i.description].join(" "))[0];
+  if (d) return d;
+  const fg = Sorter.detectGenres(folderName(i.folder_id) || "");   // 「イタリアン」フォルダに入れたなら、イタリアン
+  return fg.length === 1 ? fg[0] : "その他";
 }
 function renderGenres() {
   const box = $("#genreBar");
