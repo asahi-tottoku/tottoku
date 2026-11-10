@@ -628,7 +628,8 @@ function card(i) {
   const ft = el.querySelector(".folder-tag");
   const fname = folderName(i.folder_id);
   if (folders.length || fname) {
-    ft.textContent = fname ? `📁 ${fname}${i.folder_manual ? "" : " ✨"}` : "📁 フォルダなし";
+    // フォルダを変えるのは、この表示を押す(カードの「フォルダ」ボタンは 2026-11-11 に外した)
+    ft.textContent = (fname ? `📁 ${fname}${i.folder_manual ? "" : " ✨"}` : "📁 フォルダなし") + " ▾";
     ft.title = fname && !i.folder_manual ? "自動で選んだフォルダ" : "";
     if (fname) ft.classList.add("set");
     ft.onclick = () => openMove(i);
@@ -678,7 +679,6 @@ function card(i) {
   if (i.visited_at) { vb.textContent = "✏ 記録"; vb.classList.add("done"); }
   vb.onclick = () => openVisit(i);
   el.querySelector(".act-share").onclick = () => shareItem(i);
-  el.querySelector(".act-folder").onclick = () => openMove(i);
   const mapBtn = el.querySelector(".act-map");
   if (i.category === "飲食店" || i.category === "お出かけ" || i.lat) {
     mapBtn.hidden = false;
