@@ -104,15 +104,44 @@
     "富士宮市": ["富士市"],
   };
 
+  // ---------------------------------------------------------------- 全国の市区町村(Web版だけ)
+  // places_jp.js(self.PLACES_JP)があれば、全国の市区町村を地名の辞書に足す。
+  // 無いとき(Node のテスト)は上の辞書だけ = sorter.py と同じ答えになる。
+  // 上の辞書に元からある地名は、そちらが先(町の名前や隣の市町が付いているので)。
+  const NATIONAL = new Set();   // 全国の表から足した市区町村(文の中から探すときは、よくある言葉を外す)
+  const PLACES = [];            // { pref, name, lat, lng } 座標からいちばん近い市区町村を探す用
+  let PREF_RE = null;           // 都道府県名・郡名(文から地名を探す前に外す。「長野県北佐久郡軽井沢町」を「長野」「佐久」と間違えない)
+  if (root.PLACES_JP) {
+    const counties = new Set();
+    for (const p of root.PLACES_JP.list) {
+      const g = p.name.match(/^(.+?郡)/);
+      if (g) counties.add(g[1]);
+      const name = p.name.replace(/^.+?郡/, "");          // 「北佐久郡軽井沢町」→「軽井沢町」
+      const m = name.match(/^(.+?市)(.+区)$/);            // 政令市の区「横浜市中区」は「横浜市」の中に入れる
+      const key = m ? m[1] : name;
+      PLACES.push({ pref: p.pref, name, lat: p.lat, lng: p.lng });
+      if (!AREAS[key]) { AREAS[key] = []; NATIONAL.add(key); }
+      if (m && !AREAS[key].includes(name)) AREAS[key].push(name);
+    }
+    PREF_RE = new RegExp([...root.PLACES_JP.prefs, ...counties].map((s) => s.normalize("NFKC")).join("|"), "g");
+  }
+  // 名前から「市」などを外すと、ふつうの言葉と同じになる市町村(文の中では「〇〇市」「〇〇町」と書いてあるときだけ合わせる)
+  const COMMON_WORDS = new Set(["中央", "大和", "朝日", "昭和", "明和", "美里", "美郷", "美浜", "南部", "太子", "日高",
+    "池田", "金山", "高森", "本山", "大町", "清水", "緑", "青葉", "旭", "白山", "長和", "和光", "大洗", "東", "西",
+    "南", "北", "平和", "共和", "協和", "福井", "幸", "栄", "豊", "三和", "八幡", "神山", "小山", "大石", "大平",
+    "大川", "大野", "高野", "上野", "神田", "佐賀", "宮崎", "熊本", "大分", "長崎", "福島"]);
+
   // 「御殿場市」「御殿場駅」→「御殿場」
   function bare(name) {
     const b = name.replace(/(都|道|府|県|市|区|町|村|駅)$/, "");
     return b.length >= 2 ? b : name;
   }
 
+  // 全国の表があるとき(Web版)は、「中央区」→「中央」のような、ふつうの言葉になる短い形は使わない
+  const bareOk = (k) => (NATIONAL.size && COMMON_WORDS.has(bare(k)) ? k : bare(k));
   function areaWords(key) {
-    let words = [key, bare(key), ...AREAS[key]];
-    for (const n of NEIGHBORS[key] || []) words = words.concat([n, bare(n)], AREAS[n] || []);
+    let words = [key, bareOk(key), ...AREAS[key]];
+    for (const n of NEIGHBORS[key] || []) words = words.concat([n, bareOk(n)], AREAS[n] || []);
     return words;
   }
 
@@ -123,7 +152,12 @@
   }
 
   // フォルダ名の1語を、[種類, 合う言葉の正規表現のリスト, 親ジャンル] にする
+  const tokenCache = new Map();
   function resolveToken(token) {
+    if (!tokenCache.has(token)) tokenCache.set(token, resolveToken0(token));
+    return tokenCache.get(token);
+  }
+  function resolveToken0(token) {
     const t = fnorm(token);
     for (const [name, [words, parent]] of Object.entries(GENRES)) {
       if ([...words, name].some((w) => fnorm(w) === t)) {
@@ -202,7 +236,8 @@
 
   // 文の中から、辞書にある地名を1つ返す(地域の欄にする)。町の名前を先に、なければ市区町
   function detectPlace(text) {
-    const t = fnorm(text);
+    let t = fnorm(text);
+    if (PREF_RE) t = t.replace(PREF_RE, " ");
     let hit = null;
     for (const [key, members] of Object.entries(AREAS)) {
       for (const m of members) {
@@ -211,10 +246,34 @@
       }
     }
     if (hit) return hit.w;
-    for (const key of Object.keys(AREAS)) {
-      if (new RegExp(placePattern(key)).test(t) || t.includes(fnorm(bare(key)))) return bare(key);
+    if (!NATIONAL.size) {   // 全国の表が無いとき(PC版と同じ)
+      for (const key of Object.keys(AREAS)) {
+        if (new RegExp(placePattern(key)).test(t) || t.includes(fnorm(bare(key)))) return bare(key);
+      }
+      return "";
     }
-    return "";
+    // 全国の表があるとき: 文の中でいちばん前に出てくる市区町村(同じ位置なら長い名前)
+    for (const key of Object.keys(AREAS)) {
+      const full = t.search(new RegExp(placePattern(key)));
+      const b = bare(key);
+      const short = b !== key && !(NATIONAL.has(key) && COMMON_WORDS.has(b)) ? t.indexOf(fnorm(b)) : -1;
+      for (const [i, len] of [[full, key.length], [short, b.length]]) {
+        if (i >= 0 && (!hit || i < hit.i || (i === hit.i && len > hit.len))) hit = { i, len, w: b };
+      }
+    }
+    return hit ? hit.w : "";
+  }
+
+  // 座標から、いちばん近い市区町村の名前(「御殿場市」「港区」「横浜市中区」)。表が無いか、25km より遠ければ ""
+  function placeFromCoords(lat, lng) {
+    if (!PLACES.length || lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return "";
+    const k = Math.cos(lat * Math.PI / 180);
+    let best = null, bd = Infinity;
+    for (const p of PLACES) {
+      const d = (p.lat - lat) ** 2 + ((p.lng - lng) * k) ** 2;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return Math.sqrt(bd) * 111 <= 25 ? best.name : "";
   }
 
   // ---------------------------------------------------------------- URL の手がかり(Web版だけで使う。通信はしない)
@@ -261,7 +320,7 @@
   }
 
   const api = { fnorm, GENRES, AREAS, NEIGHBORS, resolveToken, splitName, folderMatch, itemTexts, pickFolder,
-    detectGenres, detectPlace, urlHints };
+    detectGenres, detectPlace, urlHints, placeFromCoords };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Sorter = api;
 })(typeof self !== "undefined" ? self : this);

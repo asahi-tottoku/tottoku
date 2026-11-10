@@ -97,7 +97,7 @@
     const tags = [...new Set([...S.detectGenres(all), ...hint.genres])].slice(0, 6);
     Object.assign(it, {
       title, description: desc, site: h,
-      area: S.detectPlace(all) || hint.place, tags,
+      area: S.detectPlace(all) || hint.place || S.placeFromCoords(mi.lat, mi.lng), tags,
       category: categoryOf(h, it.url, tags),
       lat: mi.lat ?? null, lng: mi.lng ?? null, status: "done",
     });
