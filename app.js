@@ -4,6 +4,7 @@ const WD = "日月火水木金土";
 let items = [];
 let folders = [];
 let activeFolder = "all";   // "all" | "none" | フォルダid
+let activeGenre = null;      // フォルダの中で選んだジャンル(null = すべて)
 let hitIds = null;          // (旧「AIに聞く」の名残。今は常に null)
 let view = "list";          // "list" | "map"
 let myPos = null;           // 現在地 {lat, lng}
@@ -66,7 +67,7 @@ function renderFolders() {
     const b = document.createElement("button");
     b.className = "fbtn" + (key === activeFolder ? " on" : "");
     b.innerHTML = `${escapeHtml(label)}<small>${n}</small>`;
-    b.onclick = () => { activeFolder = key; render(); };
+    b.onclick = () => { activeFolder = key; activeGenre = null; render(); };
     if (typeof key === "number") attachFolderPress(b, key);
     box.appendChild(b);
   });
@@ -461,6 +462,36 @@ function renderRemind() {
   });
 }
 
+// ---------------------------------------------------------------- フォルダの中のジャンル分け(自動)
+// フォルダを開くと、中のお店のジャンル(焼肉・寿司…)のボタンを自動で出す。押すとそのジャンルだけ見せる。
+// フォルダは増やさない。ジャンルが2つ以上あるときだけ出す(「御殿場 焼肉」のようなフォルダでは出ない)。
+const GENRE_NAMES = new Set(Object.keys(Sorter.GENRES));
+function genreOf(i) {
+  const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
+  if (t) return t;
+  return Sorter.detectGenres([i.title, ...(i.tags || []), i.summary, i.description].join(" "))[0] || "その他";
+}
+function renderGenres() {
+  const box = $("#genreBar");
+  box.innerHTML = "";
+  const q = filterQ();
+  const inside = typeof activeFolder === "number" ? items.filter((i) => inFolder(i) && matches(i, q)) : [];
+  const count = new Map();
+  inside.forEach((i) => { const g = genreOf(i); count.set(g, (count.get(g) || 0) + 1); });
+  if (count.size < 2) { box.hidden = true; activeGenre = null; return; }
+  if (activeGenre && !count.has(activeGenre)) activeGenre = null;
+  const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
+  [[null, "すべて", inside.length], ...order.map(([g, n]) => [g, g, n])].forEach(([g, label, n]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip" + (g === activeGenre ? " on" : "");
+    b.innerHTML = `${escapeHtml(label)}<small>${n}</small>`;
+    b.onclick = () => { activeGenre = g; render(); };
+    box.appendChild(b);
+  });
+  box.hidden = false;
+}
+
 // ---------------------------------------------------------------- 一覧
 function inFolder(i) {
   if (activeFolder === "all") return true;
@@ -486,7 +517,7 @@ const filterQ = () => (searchMode === "web" ? "" : searchText());
 
 function currentList() {
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q));
+  const base = items.filter((i) => inFolder(i) && matches(i, q) && (!activeGenre || genreOf(i) === activeGenre));
   const vf = $("#visitSel").value;
   let list = base.filter((i) =>
     (vf === "all" || (vf === "went" ? i.visited_at : !i.visited_at)));
@@ -505,6 +536,7 @@ function currentList() {
 
 function render() {
   renderFolders();
+  renderGenres();
   renderRemind();
   const list = currentList();
   document.querySelectorAll("#viewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
