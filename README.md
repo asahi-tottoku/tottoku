@@ -16,3 +16,7 @@
 ## 外部とのやりとり
 
 画面は次のものだけを読み込みます: 地図を表示するときの地図画像(OpenStreetMap)と地図の部品(cdnjs)。保存したデータを外に送ることはありません。
+
+## データの出典
+
+地名の辞書(`places_jp.js`)は、[Geolonia「japanese-addresses」](https://github.com/geolonia/japanese-addresses)(CC BY 4.0)を元に、市区町村ごとの中心の座標を計算して作りました。
