@@ -364,9 +364,17 @@ function openNote(item) {
 }
 
 // ---------------------------------------------------------------- 地域だけ直す(カードの「📍」を押したとき)
-function openArea(item) {
+// ask=true: 保存した直後に「地域が分かりませんでした」と聞く。閉じたら終わる Promise を返す
+function openArea(item, ask = false) {
   const dlg = $("#areaDlg");
   const input = $("#areaOnlyInput");
+  const head = dlg.querySelector(".sheet-title");
+  head.textContent = ask ? "地域が分かりませんでした。\nどこのお店ですか?" : "📍 地域";
+  head.style.whiteSpace = "pre-line";
+  $("#areaCancel").textContent = ask ? "あとで" : "閉じる";
+  let finish = () => {};
+  let saving = false;
+  const closed = new Promise((ok) => { finish = ok; });
   $("#areaName").textContent = item.title;
   input.value = item.area || "";
   // 候補: 座標・住所から分かる地域、ほかのお店で使っている地域(多い順)
@@ -382,21 +390,27 @@ function openArea(item) {
   cands.slice(0, 10).forEach((a) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "chip"; b.textContent = a;
-    b.onclick = () => { input.value = a; };
+    b.onclick = () => { input.value = a; if (ask) save(); };   // 聞いているときは、押すだけで決まる
     box.appendChild(b);
   });
   const save = async () => {
     const v = input.value.trim();
+    saving = true;
     dlg.close();
-    if (v === (item.area || "")) return;
-    await api(`/api/items/${item.id}`, { method: "PATCH", body: { area: v } });
-    toast(v ? `地域を「${v}」にしました` : "地域を消しました");
-    load();
+    if (v !== (item.area || "")) {
+      await api(`/api/items/${item.id}`, { method: "PATCH", body: { area: v } });
+      toast(v ? `地域を「${v}」にしました` : "地域を消しました");
+      await load();
+    }
+    finish();
   };
   $("#areaSave").onclick = save;
   input.onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); save(); } };
   $("#areaCancel").onclick = () => dlg.close();
+  dlg.onclose = () => { if (!saving) finish(); };
   dlg.showModal();
+  if (ask) input.blur();   // 候補のボタンがキーボードに隠れないように
+  return closed;
 }
 
 // ---------------------------------------------------------------- 送る(LINEなど)
@@ -502,6 +516,7 @@ function renderRemind() {
 // フォルダを開くと、中のお店のジャンル(焼肉・寿司…)のボタンを自動で出す。押すとそのジャンルだけ見せる。
 // フォルダは増やさない。ジャンルが2つ以上あるときだけ出す(「御殿場 焼肉」のようなフォルダでは出ない)。
 const GENRE_NAMES = new Set(Object.keys(Sorter.GENRES));
+const GENRE_LABEL = { "蕎麦": "蕎麦・うどん" };   // ボタンに出す名前(うどんの店も「蕎麦」に入るので)
 function genreOf(i) {
   const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
   if (t) return t;
@@ -520,7 +535,7 @@ function renderGenres() {
   if (count.size < 2) { box.hidden = true; activeGenre = null; return; }
   if (activeGenre && !count.has(activeGenre)) activeGenre = null;
   const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
-  [[null, "すべて", inside.length], ...order.map(([g, n]) => [g, g, n])].forEach(([g, label, n]) => {
+  [[null, "すべて", inside.length], ...order.map(([g, n]) => [g, GENRE_LABEL[g] || g, n])].forEach(([g, label, n]) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "chip" + (g === activeGenre ? " on" : "");
@@ -589,7 +604,25 @@ function currentList() {
   return list;
 }
 
+// バックアップのお知らせ: 5件以上あって、前回の書き出し(無ければ最初の保存)から30日たったら出す。
+// 「あとで」で7日休む。通信はしない(この端末の中の日付を見るだけ)。
+function renderBackup() {
+  const box = $("#remind");
+  const DAY = 86400000, now = Date.now();
+  const last = Number(getPref("exportedAt", 0)) || 0;
+  const first = items.reduce((m, i) => Math.min(m, (i.created_at || 0) * 1000 || now), now);
+  const due = items.length >= 5 && now - (last || first) > 30 * DAY && now > (Number(getPref("backupSnooze", 0)) || 0);
+  box.hidden = !due;
+  if (!due) return;
+  box.innerHTML = `<p class="remind-title">💾 バックアップを取りませんか</p>
+    <p class="remind-text">${last ? "前回の書き出しから1か月以上たちました。" : "まだ一度も書き出していません。"}データはこのスマホの中だけにあり、機種変更やブラウザのデータ削除で消えます。</p>
+    <div class="remind-btns"><button id="backupNow" class="go">書き出す</button><button id="backupLater">あとで</button></div>`;
+  $("#backupNow").onclick = () => $("#exportBtn").click();
+  $("#backupLater").onclick = () => { setPref("backupSnooze", now + 7 * DAY); renderBackup(); };
+}
+
 function render() {
+  renderBackup();
   renderFolders();
   renderGenres();
   renderAreas();
@@ -819,7 +852,11 @@ async function saveItem(v, fid) {
 // (選んだものは「自分で選んだ」になり、同じ名前・同じチェーンの店を次から同じフォルダに入れる)
 async function afterSave(id, auto) {
   await load();
-  const it = items.find((x) => x.id === id);
+  let it = items.find((x) => x.id === id);
+  if (it && auto && !(it.area || areaOf(it))) {   // 地域が分からない → 先に聞く(入れるとフォルダも振り分け直す)
+    await openArea(it, true);
+    it = items.find((x) => x.id === id);
+  }
   const where = it && folderName(it.folder_id);
   if (it && !where && auto && folders.length) { openMove(it, true); return; }
   toast(where ? `「${where}」に保存しました` : "とっとくに保存しました");
@@ -958,6 +995,8 @@ $("#exportBtn").onclick = async () => {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }
   setPref("exported", `${d.getMonth() + 1}/${d.getDate()}`);
+  setPref("exportedAt", d.getTime());
+  renderBackup();
   renderSettings();
   toast(`${data.items.length}件を書き出しました`);
 };

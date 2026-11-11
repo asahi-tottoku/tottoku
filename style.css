@@ -118,6 +118,7 @@ form button[type=submit] { background: var(--accent); color: var(--on-accent); b
   background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent);
 }
 .actions .act-reserve[hidden] { display: none; }
+.actions .act-del { margin-left: auto; }
 .actions .act-del:hover { color: #d33; border-color: #d33; }
 
 .empty { color: var(--muted); text-align: center; margin-top: 40px; }
@@ -224,6 +225,10 @@ form button[type=submit] { background: var(--accent); color: var(--on-accent); b
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .remind-row small { color: var(--muted); font-size: 11px; }
 .remind-row button { font-size: 12px; padding: 3px 10px; }
+.remind-text { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+.remind-btns { display: flex; gap: 8px; }
+.remind-btns button { font-size: 13px; padding: 5px 14px; border-radius: 8px; }
+.remind-btns .go { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 700; }
 
 /* ---------- 一覧/地図の切り替え・並べ方 ---------- */
 .viewbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }

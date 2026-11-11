@@ -245,9 +245,40 @@
   function detectGenres(text) {
     const t = fnorm(text);
     const latin = t.replace(/[^a-z]+/g, " ");
+    const raw = String(text || "").normalize("NFKC");
     return Object.entries(GENRES).filter(([name, [words]]) => [...words, name].some((w) => t.includes(fnorm(w))) ||
-      (URL_GENRES[name] || []).some((w) => latin.includes(w)))
+      (URL_GENRES[name] || []).some((w) => latin.includes(w)) ||
+      (MORE_WORDS[name] || []).some((w) => t.includes(fnorm(w))) ||
+      (KANA_WORDS[name] || []).some(([w, bad]) => hasKanaWord(raw, w, bad)))
       .map(([name]) => name);
+  }
+
+  // かな書きの店名(「すし匠」「そば 田中」)。Web版だけ。PC版と同じ辞書(GENRES)には足さない。
+  // 短いかなは、ふつうの文にも出てくる(「すぐそば」「焼きそば」)ので、前後がひらがなのときは数えない。
+  // 前が「お」のときは数える(「おすし」「おそば」)。bad は、前にあったら数えない言葉。
+  const KANA_WORDS = {
+    "寿司": [["すし", null]],
+    "蕎麦": [["そば", /(中華|焼|油|汁なし|支那|台湾)$/]],
+  };
+  // 長めの言葉は、そのまま探す
+  const MORE_WORDS = {
+    "天ぷら": ["てんぷら", "天丼"],
+    "うなぎ": ["うな重", "うな丼"],
+    "焼き鳥": ["焼きとり", "串焼"],
+    "ラーメン": ["らぁ麺", "らあめん", "ラー麺", "麺屋"],
+    "中華": ["ぎょうざ", "ギョーザ", "ギョウザ"],
+    "イタリアン": ["ピッツェリア", "スパゲッティ", "スパゲティ"],
+  };
+  const HIRA = /[ぁ-ん]/;
+  function hasKanaWord(t, w, bad) {
+    for (let i = t.indexOf(w); i >= 0; i = t.indexOf(w, i + 1)) {
+      const b = t[i - 1] || "", a = t[i + w.length] || "";
+      if (HIRA.test(a) || (HIRA.test(b) && b !== "お")) continue;
+      if (b === "お" && HIRA.test(t[i - 2] || "")) continue;
+      if (bad && bad.test(t.slice(0, i))) continue;
+      return true;
+    }
+    return false;
   }
 
   // 文の中から、辞書にある地名を1つ返す(地域の欄にする)。町の名前を先に、なければ市区町
