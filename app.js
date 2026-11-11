@@ -363,6 +363,42 @@ function openNote(item) {
   dlg.showModal();
 }
 
+// ---------------------------------------------------------------- 地域だけ直す(カードの「📍」を押したとき)
+function openArea(item) {
+  const dlg = $("#areaDlg");
+  const input = $("#areaOnlyInput");
+  $("#areaName").textContent = item.title;
+  input.value = item.area || "";
+  // 候補: 座標・住所から分かる地域、ほかのお店で使っている地域(多い順)
+  const cands = [];
+  const add = (a) => { a = (a || "").trim(); if (a && !cands.includes(a)) cands.push(a); };
+  if (item.lat != null && item.lng != null) add(Sorter.placeFromCoords(item.lat, item.lng));
+  add(Sorter.areaGroup(item.address));
+  const used = new Map();
+  items.forEach((i) => { if (i.area) used.set(i.area, (used.get(i.area) || 0) + 1); });
+  [...used].sort((a, b) => b[1] - a[1]).forEach(([a]) => add(a));
+  const box = $("#areaChips");
+  box.innerHTML = "";
+  cands.slice(0, 10).forEach((a) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = a;
+    b.onclick = () => { input.value = a; };
+    box.appendChild(b);
+  });
+  const save = async () => {
+    const v = input.value.trim();
+    dlg.close();
+    if (v === (item.area || "")) return;
+    await api(`/api/items/${item.id}`, { method: "PATCH", body: { area: v } });
+    toast(v ? `地域を「${v}」にしました` : "地域を消しました");
+    load();
+  };
+  $("#areaSave").onclick = save;
+  input.onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); save(); } };
+  $("#areaCancel").onclick = () => dlg.close();
+  dlg.showModal();
+}
+
 // ---------------------------------------------------------------- 送る(LINEなど)
 async function shareItem(i) {
   const url = i.shop_url || i.url || "";
@@ -608,7 +644,6 @@ function card(i) {
     th.querySelector("img").onerror = noimg;
   } else noimg();
   el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : i.category;
-  el.querySelector(".area").textContent = i.area || "";
   const d = distKm(i);
   el.querySelector(".dist").textContent = d != null ? "📍" + fmtKm(d) : "";
   el.querySelector(".date").textContent = fmtDate(i.created_at) + (i.site ? " · " + i.site.replace(/^www\./, "") : "");
@@ -625,6 +660,14 @@ function card(i) {
     if (fname) ft.classList.add("set");
     ft.onclick = () => openMove(i);
   } else ft.remove();
+
+  // 地域(分かっていれば濃く表示。分からなければ薄く「地域を入れる」)。押すと地域を直せる
+  const at = el.querySelector(".area-tag");
+  const place = i.area || areaOf(i);
+  at.textContent = place ? `📍 ${place}` : "📍 地域を入れる";
+  if (place) at.classList.add("set");
+  at.title = "地域を直す";
+  at.onclick = () => openArea(i);
 
   el.querySelector(".who").textContent = i.recommender ? `👤 ${i.recommender}のおすすめ` : "";
 

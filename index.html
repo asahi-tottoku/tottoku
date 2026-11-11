@@ -136,6 +136,15 @@
   <button id="visitCancel" class="sheet-cancel">閉じる</button>
 </dialog>
 
+<dialog id="areaDlg" class="sheet">
+  <p class="sheet-title">📍 地域</p>
+  <p id="areaName" class="sheet-sub"></p>
+  <input id="areaOnlyInput" type="text" class="field" placeholder="例:御殿場、渋谷、横浜市中区" autocomplete="off" enterkeyhint="done">
+  <div id="areaChips" class="who-chips"></div>
+  <button id="areaSave" class="sheet-ok">保存</button>
+  <button id="areaCancel" class="sheet-cancel">閉じる</button>
+</dialog>
+
 <dialog id="noteDlg" class="sheet">
   <p class="sheet-title">名前・メモ・教えてくれた人</p>
   <p id="noteName" class="sheet-sub"></p>
@@ -156,8 +165,8 @@
   <li class="card">
     <a class="thumb" target="_blank" rel="noopener"><img alt="" loading="lazy"></a>
     <div class="body">
-      <div class="meta"><span class="cat"></span><span class="area"></span><span class="dist"></span><span class="date"></span></div>
-      <button class="folder-tag"></button>
+      <div class="meta"><span class="cat"></span><span class="dist"></span><span class="date"></span></div>
+      <div class="tagrow"><button class="area-tag"></button><button class="folder-tag"></button></div>
       <a class="title" target="_blank" rel="noopener"></a>
       <p class="summary"></p>
       <p class="visit"></p>
