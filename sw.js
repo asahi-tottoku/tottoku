@@ -1,6 +1,6 @@
 // サービスワーカー: 一度開けば、電波が無くても「とっとく」を開けるように、画面のファイルを端末にしまっておく。
 // データ(保存したもの)は IndexedDB にあり、ここでは扱わない。画面を変えたら CACHE の番号を上げる。
-const CACHE = "tottoku-web-v11";
+const CACHE = "tottoku-web-v12";
 const SHELL = ["./", "index.html", "app.js", "localdb.js", "places_jp.js", "sorter.js", "install.js", "style.css",
   "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
 
