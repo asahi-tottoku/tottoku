@@ -14,11 +14,18 @@ async function api(path, opts = {}) {
   return LocalAPI.request(opts.method || "GET", path, opts.body || {});
 }
 
-function toast(msg) {
+// act = { label, fn, ms }: お知らせの中にボタンを1つ出す(「元に戻す」)
+function toast(msg, act) {
   const t = $("#toast");
   t.textContent = msg; t.hidden = false;
+  if (act) {
+    const b = document.createElement("button");
+    b.textContent = act.label;
+    b.onclick = () => { t.hidden = true; act.fn(); };
+    t.appendChild(b);
+  }
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (t.hidden = true), 2800);
+  toast.timer = setTimeout(() => (t.hidden = true), act ? act.ms : 2800);
 }
 
 function getPref(k, d) { try { return localStorage.getItem("tottoku-" + k) || d; } catch (e) { return d; } }
@@ -300,43 +307,6 @@ function openMove(item, ask = false) {
   dlg.showModal();
 }
 
-// ---------------------------------------------------------------- 行った・評価
-function stars(n) { return "★".repeat(n || 0) + "☆".repeat(5 - (n || 0)); }
-
-function openVisit(item) {
-  const dlg = $("#visitDlg");
-  $("#visitName").textContent = item.title;
-  const d = item.visited_at ? new Date(item.visited_at * 1000) : new Date();
-  $("#visitDate").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  $("#visitReview").value = item.review || "";
-  let rating = item.rating || 0;
-  const drawStars = () => {
-    $("#stars").innerHTML = "";
-    for (let n = 1; n <= 5; n++) {
-      const b = document.createElement("button");
-      b.textContent = n <= rating ? "★" : "☆";
-      b.className = n <= rating ? "on" : "";
-      b.setAttribute("aria-label", `${n}つ星`);
-      b.onclick = () => { rating = rating === n ? 0 : n; drawStars(); };
-      $("#stars").appendChild(b);
-    }
-  };
-  drawStars();
-  $("#visitUndo").hidden = !item.visited_at;
-  $("#visitSave").onclick = async () => {
-    const [y, m, dd] = $("#visitDate").value.split("-").map(Number);
-    const at = y ? new Date(y, m - 1, dd, 12).getTime() / 1000 : Date.now() / 1000;
-    await api(`/api/items/${item.id}`, { method: "PATCH",
-      body: { visited_at: at, rating: rating || null, review: $("#visitReview").value.trim() } });
-    dlg.close(); toast("記録しました"); load();
-  };
-  $("#visitUndo").onclick = async () => {
-    await api(`/api/items/${item.id}`, { method: "PATCH", body: { visited_at: null, rating: null, review: "" } });
-    dlg.close(); load();
-  };
-  dlg.showModal();
-}
-
 // ---------------------------------------------------------------- メモ・教えてくれた人
 function openNote(item) {
   const dlg = $("#noteDlg");
@@ -477,46 +447,11 @@ function compactHours(text) {
   return out.join("\n") + (rest ? "\n" + rest : "");
 }
 
-// ---------------------------------------------------------------- わすれてない?
-function renderRemind() {
-  const box = $("#remind");
-  const now = Date.now() / 1000;
-  const list = items.filter((i) => i.status === "done" && !i.visited_at &&
-      (i.category === "飲食店" || i.category === "お出かけ" || i.address) &&
-      now - i.created_at > 30 * 86400 && !(i.snooze_until > now))
-    .sort((a, b) => a.created_at - b.created_at).slice(0, 3);
-  box.hidden = !list.length || !!hitIds;
-  box.innerHTML = "";
-  if (!list.length) return;
-  const h = document.createElement("p");
-  h.className = "remind-title";
-  h.textContent = "⏰ わすれてない? まだ行っていないお店";
-  box.appendChild(h);
-  list.forEach((i) => {
-    const row = document.createElement("div");
-    row.className = "remind-row";
-    const days = Math.floor((now - i.created_at) / 86400);
-    const name = document.createElement("a");
-    name.href = i.url || "#"; name.target = "_blank"; name.rel = "noopener";
-    name.innerHTML = `${escapeHtml(i.title)} <small>${days}日前に保存</small>`;
-    const went = document.createElement("button");
-    went.textContent = "行った"; went.onclick = () => openVisit(i);
-    const later = document.createElement("button");
-    later.textContent = "あとで";
-    later.onclick = async () => {
-      await api(`/api/items/${i.id}`, { method: "PATCH", body: { snooze_until: now + 30 * 86400 } });
-      toast("30日後にまたお知らせします"); load();
-    };
-    row.append(name, went, later);
-    box.appendChild(row);
-  });
-}
-
 // ---------------------------------------------------------------- フォルダの中のジャンル分け(自動)
 // フォルダを開くと、中のお店のジャンル(焼肉・寿司…)のボタンを自動で出す。押すとそのジャンルだけ見せる。
 // フォルダは増やさない。ジャンルが2つ以上あるときだけ出す(「御殿場 焼肉」のようなフォルダでは出ない)。
 const GENRE_NAMES = new Set(Object.keys(Sorter.GENRES));
-const GENRE_LABEL = { "蕎麦": "蕎麦・うどん" };   // ボタンに出す名前(うどんの店も「蕎麦」に入るので)
+const GENRE_LABEL = { "蕎麦": "蕎麦・うどん", "お好み焼き": "お好み焼き・たこ焼き", "バー": "バー・お酒" };   // ボタンに出す名前(うどんの店も「蕎麦」に入るので)
 function genreOf(i) {
   const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
   if (t) return t;
@@ -728,7 +663,6 @@ function card(i) {
     rsv.href = i.reserve_url;
     const site = new URL(i.reserve_url).hostname;
     rsv.title = "予約ページを開く(" + site + ")";
-    if (site.includes("tabelog")) rsv.textContent = "📅 ネット予約(食べログ)";
   }
   el.querySelector(".act-share").onclick = () => shareItem(i);
   const mapBtn = el.querySelector(".act-map");
@@ -744,9 +678,15 @@ function card(i) {
   retry.hidden = true;   // Web版は、保存したその場で整理するので「再整理」は無い
   retry.onclick = async () => { await api(`/api/items/${i.id}/retry`, { method: "POST", body: {} }); toast("整理し直しています"); load(); };
   el.querySelector(".act-del").onclick = async () => {
-    if (!confirm(`「${i.title}」を削除しますか?`)) return;
+    // 確かめの画面は出さず、消したあと8秒だけ「元に戻す」を出す
     await api(`/api/items/${i.id}`, { method: "DELETE" });
-    load();
+    await load();
+    const name = (i.title || "").length > 14 ? i.title.slice(0, 13) + "…" : i.title;
+    toast(`「${name}」を削除しました`, { label: "元に戻す", ms: 8000, fn: async () => {
+      await api("/api/items/restore", { method: "POST", body: { item: i } });
+      await load();
+      toast("元に戻しました");
+    } });
   };
   return el;
 }
@@ -789,7 +729,7 @@ async function renderMap(list) {
     const html = `<b>${escapeHtml(i.title)}</b><br><small>${escapeHtml(i.area || "")}${d != null ? " · " + fmtKm(d) : ""}</small>` +
       (todayHours(i) ? `<br><small>${escapeHtml(todayHours(i))}</small>` : "") +
       `<br><a href="${escapeHtml(i.url || "#")}" target="_blank" rel="noopener">開く</a>` +
-      (i.reserve_url ? ` · <a href="${escapeHtml(i.reserve_url)}" target="_blank" rel="noopener">ネット予約</a>` : "");
+      (i.reserve_url ? ` · <a href="${escapeHtml(i.reserve_url)}" target="_blank" rel="noopener">予約</a>` : "");
     mapLayer.addLayer(L.marker([i.lat, i.lng], { icon }).bindPopup(html));
     pts.push([i.lat, i.lng]);
   });
@@ -910,11 +850,10 @@ document.querySelectorAll("#viewSeg button").forEach((b) => {
 });
 
 // ダイアログ共通: 外側を押すか「閉じる」で閉じる
-["#moveDlg", "#visitDlg", "#noteDlg", "#settingsDlg"].forEach((id) => {
+["#moveDlg", "#areaDlg", "#noteDlg", "#settingsDlg"].forEach((id) => {
   $(id).addEventListener("click", (e) => { if (e.target === $(id)) $(id).close(); });
 });
 $("#moveCancel").onclick = () => $("#moveDlg").close();
-$("#visitCancel").onclick = () => $("#visitDlg").close();
 $("#noteCancel").onclick = () => $("#noteDlg").close();
 
 // ---------------------------------------------------------------- 設定(色・データ)

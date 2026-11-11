@@ -74,7 +74,14 @@
 
   <div id="mapBox" class="mapbox" hidden><div id="map"></div><p id="mapNote" class="map-note"></p></div>
   <ul id="list" class="list"></ul>
-  <p id="empty" class="empty" hidden>まだ何も保存されていません。<br>上の欄に、お店のURLや名前を貼り付けて「保存」を押してください。<br>Googleマップなどの「共有」で「コピー」したものを、そのまま貼るのがおすすめです(店名も一緒に入ります)。</p>
+  <div id="empty" class="empty" hidden>
+  <p class="empty-title">とっとくの使い方</p>
+  <ol class="howto">
+    <li><b>保存する</b>:Googleマップなどでお店を開いて「共有」→「コピー」。上の欄に貼り付けて「保存」を押します。地名とジャンルで、フォルダに自動で入ります。</li>
+    <li><b>ホーム画面に置く</b>:ブラウザのメニュー(iPhone は共有ボタン)から「ホーム画面に追加」。アプリのように開けます。</li>
+    <li><b>バックアップ</b>:データはこのスマホの中だけにあります。右上の ⚙ →「全部を書き出す」で、ときどきファイルに残してください。</li>
+  </ol>
+  </div>
 </main>
 
 <div id="toast" class="toast" hidden></div>
@@ -95,6 +102,13 @@
   <button id="importBtn" class="set-btn">⬆ ファイルから読み込む(今のデータと置き換え)</button>
   <input id="importFile" type="file" accept=".json,application/json" hidden>
   <p id="backupNote" class="set-note"></p>
+  <details class="howto-box"><summary>使い方</summary>
+  <ol class="howto">
+    <li><b>保存する</b>:Googleマップなどでお店を開いて「共有」→「コピー」。上の欄に貼り付けて「保存」を押します。地名とジャンルで、フォルダに自動で入ります。</li>
+    <li><b>ホーム画面に置く</b>:ブラウザのメニュー(iPhone は共有ボタン)から「ホーム画面に追加」。アプリのように開けます。</li>
+    <li><b>バックアップ</b>:データはこのスマホの中だけにあります。右上の ⚙ →「全部を書き出す」で、ときどきファイルに残してください。</li>
+  </ol>
+  </details>
   <button id="settingsClose" class="sheet-cancel">閉じる</button>
 </dialog>
 
@@ -120,20 +134,6 @@
   <p id="folderDlgSub" class="sheet-sub order-sub">長押しして上下に動かすと並べ替え/押すと変更・削除</p>
   <div id="folderOrder" class="folder-order"></div>
   <button id="folderDlgClose" class="sheet-cancel" onclick="this.closest('dialog').close()">閉じる</button>
-</dialog>
-
-<dialog id="visitDlg" class="sheet">
-  <p class="sheet-title">行った!</p>
-  <p id="visitName" class="sheet-sub"></p>
-  <label class="set-label" for="visitDate">行った日</label>
-  <input id="visitDate" type="date" class="field">
-  <p class="set-label">評価</p>
-  <div id="stars" class="stars"></div>
-  <label class="set-label" for="visitReview">感想</label>
-  <textarea id="visitReview" class="field" rows="3" placeholder="例:タンが絶品。次は個室で。"></textarea>
-  <button id="visitSave" class="sheet-ok">保存</button>
-  <button id="visitUndo" class="sheet-cancel">まだ行っていないに戻す</button>
-  <button id="visitCancel" class="sheet-cancel">閉じる</button>
 </dialog>
 
 <dialog id="areaDlg" class="sheet">
@@ -169,12 +169,11 @@
       <div class="tagrow"><button class="folder-tag"></button><button class="area-tag"></button></div>
       <a class="title" target="_blank" rel="noopener"></a>
       <p class="summary"></p>
-      <p class="visit"></p>
       <p class="who"></p>
       <details class="shopinfo" hidden><summary></summary><div class="shopinfo-body"></div></details>
       <p class="note"></p>
-      <div class="actions main-actions">
-        <a class="act-reserve" target="_blank" rel="noopener" hidden>📅 ネット予約</a>
+      <div class="actions">
+        <a class="act-reserve" target="_blank" rel="noopener" hidden>📅 予約</a>
         <button class="act-map" hidden>地図</button>
         <button class="act-share">送る</button>
         <button class="act-note">名前・メモ</button>

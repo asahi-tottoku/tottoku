@@ -125,6 +125,21 @@
     }
     PREF_RE = new RegExp([...root.PLACES_JP.prefs, ...counties].map((s) => s.normalize("NFKC")).join("|"), "g");
   }
+  // Web版だけのジャンル(PC版の辞書と答えを変えないため、全国の表があるときだけ足す)
+  if (root.PLACES_JP) Object.assign(GENRES, {
+    "お好み焼き": [["お好み焼", "おこのみやき", "もんじゃ", "たこ焼", "たこやき"], null],
+    "鉄板焼き": [["鉄板焼", "鉄板料理"], null],
+    "バー": [["ワインバー", "ダイニングバー", "ショットバー", "スポーツバー", "カフェバー", "オイスターバー",
+              "ビアバー", "ビアホール", "ビアガーデン", "クラフトビール"], null],
+  });
+  // 短いカタカナのジャンル名は、ほかの言葉の一部のときは数えない(「ジャパン」「パンケーキ」「ハンバーガー」)。
+  // 前後がカタカナでないときだけ合う。Web版だけ。
+  const STRICT = {
+    "パン": "(?:^|[^ァ-ヶー])パン(?![ァ-ヶー])",
+    "バー": "(?:^|[^ァ-ヶー])バー(?![ァ-ヶー])",
+  };
+  const wordPat = (w) => (NATIONAL.size && STRICT[w]) || esc(fnorm(w));
+
   // 名前から「市」などを外すと、ふつうの言葉と同じになる市町村(文の中では「〇〇市」「〇〇町」と書いてあるときだけ合わせる)
   const COMMON_WORDS = new Set(["中央", "大和", "朝日", "昭和", "明和", "美里", "美郷", "美浜", "南部", "太子", "日高",
     "池田", "金山", "高森", "本山", "大町", "清水", "緑", "青葉", "旭", "白山", "長和", "和光", "大洗", "東", "西",
@@ -163,7 +178,7 @@
       if ([...words, name].some((w) => fnorm(w) === t)) {
         let all = [...words, name];
         for (const [child, [cw, cp]] of Object.entries(GENRES)) if (cp === name) all = all.concat(cw, [child]);
-        return ["genre", all.map((w) => esc(fnorm(w))), parent];
+        return ["genre", all.map(wordPat), parent];
       }
     }
     for (const key of Object.keys(AREAS)) {
@@ -212,7 +227,8 @@
   function itemTexts(item) {
     const g = (k) => String(item[k] || "");
     const tags = item.tags || [];
-    const genre = fnorm([g("title"), g("category"), g("summary"), g("description"), g("note"), tags.join(" ")].join(" "));
+    const sep = NATIONAL.size ? "|" : " ";
+    const genre = fnorm([g("title"), g("category"), g("summary"), g("description"), g("note"), tags.join(sep)].join(sep));
     const place = [g("title"), g("area"), g("address")];
     if (!g("area") && !g("address")) place.push(g("description"));
     return [genre, fnorm(place.join(" "))];
@@ -246,8 +262,10 @@
     const t = fnorm(text);
     const latin = t.replace(/[^a-z]+/g, " ");
     const raw = String(text || "").normalize("NFKC");
-    return Object.entries(GENRES).filter(([name, [words]]) => [...words, name].some((w) => t.includes(fnorm(w))) ||
+    const has = (w) => (STRICT[w] ? new RegExp(STRICT[w]).test(raw) : t.includes(fnorm(w)));
+    return Object.entries(GENRES).filter(([name, [words]]) => [...words, name].some(has) ||
       (URL_GENRES[name] || []).some((w) => latin.includes(w)) ||
+      (name === "バー" && /(^| )bar( |$)/.test(latin)) ||
       (MORE_WORDS[name] || []).some((w) => t.includes(fnorm(w))) ||
       (KANA_WORDS[name] || []).some(([w, bad]) => hasKanaWord(raw, w, bad)))
       .map(([name]) => name);
@@ -268,6 +286,7 @@
     "ラーメン": ["らぁ麺", "らあめん", "ラー麺", "麺屋"],
     "中華": ["ぎょうざ", "ギョーザ", "ギョウザ"],
     "イタリアン": ["ピッツェリア", "スパゲッティ", "スパゲティ"],
+    "パン": ["メロンパン", "カレーパン", "コッペパン", "クロワッサン", "ベーグル"],
   };
   const HIRA = /[ぁ-ん]/;
   function hasKanaWord(t, w, bad) {

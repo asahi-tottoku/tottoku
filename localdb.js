@@ -236,6 +236,11 @@
       if (method === "GET" && path === "/api/items") {
         return { items: [...mem.items].sort((a, b) => b.created_at - a.created_at), folders: sortedFolders().map(({ id, name }) => ({ id, name })) };
       }
+      if (method === "POST" && path === "/api/items/restore") {   // 消した直後の「元に戻す」
+        const it = body.item;
+        if (it && it.id != null && !mem.items.some((i) => i.id === it.id)) mem.items.push(it);
+        return { ok: true };
+      }
       if (method === "POST" && path === "/api/items") return { id: addItem(body).id };
       if (method === "POST" && path === "/api/folders") {
         const name = String(body.name || "").trim().slice(0, 30);
