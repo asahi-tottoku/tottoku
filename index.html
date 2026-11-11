@@ -58,6 +58,7 @@
     <div id="folders" class="folders"></div>
     <button id="folderMore" class="fbtn more" title="フォルダの管理" aria-label="フォルダの管理">⋯</button>
   </div>
+  <div id="areaBar" class="chips area-bar" hidden></div>
   <div id="genreBar" class="chips genre-bar" hidden></div>
 
   <div class="viewbar">
@@ -65,12 +66,13 @@
       <button data-view="list">☰ 一覧</button>
       <button data-view="map">🗺 地図</button>
     </div>
-    <select id="areaSel" aria-label="地域"><option value="all">📍 全地域</option></select>
     <select id="sortSel" aria-label="並べ方">
       <option value="new">新しい順</option>
       <option value="near">近い順</option>
     </select>
   </div>
+
+  <div id="filterLine" class="filter-line" hidden></div>
 
   <div id="mapBox" class="mapbox" hidden><div id="map"></div><p id="mapNote" class="map-note"></p></div>
   <ul id="list" class="list"></ul>

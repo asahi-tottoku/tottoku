@@ -131,6 +131,26 @@
   // 3. 新しく保存したものが辞書で決まらず、同じ名前のお店がどこかのフォルダにあれば、それに合わせる
   // 4. (Web版だけ)それでも決まらず、同じチェーンの別の店がフォルダにあれば、それに合わせる(自分で選んだものを先に)
   // 決まらなかったものは、今のフォルダのまま動かさない(新しく保存したときは、画面がどこに入れるか聞く)
+  // 自分で直した結果を覚える: 同じくらい合うフォルダが複数あって決まらないとき、
+  // 前に同じ組み合わせで迷って自分で選んだお店があれば、多く選ばれた側に入れる(同数なら決めない)。
+  function learnedFolder(rows, fl, all, sigs) {
+    const sigOf = (list) => [...S.topFolders(list, fl)].sort((a, b) => a - b).join(",");
+    const top = S.topFolders(rows, fl);
+    if (top.length < 2) return null;
+    const sig = sigOf(rows);
+    const mine = new Set(rows.map((r) => r.id));
+    const votes = new Map();
+    for (const r of all) {
+      if (!r.folder_manual || mine.has(r.id) || !top.includes(r.folder_id)) continue;
+      if (!sigs.has(r.id)) sigs.set(r.id, sigOf([r]));
+      if (sigs.get(r.id) === sig) votes.set(r.folder_id, (votes.get(r.folder_id) || 0) + 1);
+    }
+    const order = [...votes].sort((a, b) => b[1] - a[1]);
+    if (!order.length || (order[1] && order[1][1] === order[0][1])) return null;
+    return order[0][0];
+  }
+
+  let learnedId = null;   // いま保存したものが「前と同じ分け方」で入ったら、その id
   function assignFolders(ids = null, newItem = false) {
     const fl = sortedFolders();
     if (!fl.length) return 0;
@@ -144,6 +164,7 @@
       groups.get(k).push(r);
     }
     let moved = 0;
+    const sigs = new Map();
     for (const [key, rows] of groups) {
       const same = all.filter((r) => norm(r.title) === key && fids.has(r.folder_id));
       const manual = same.filter((r) => r.folder_manual);
@@ -162,6 +183,10 @@
               .sort((a, b) => (b.folder_manual || 0) - (a.folder_manual || 0));
             if (chain.length) fid = chain[0].folder_id;
           }
+        }
+        if (fid == null) {
+          fid = learnedFolder(rows, fl, all, sigs);
+          if (fid != null && newItem) learnedId = rows[0].id;
         }
       }
       if (fid == null) continue;
@@ -192,6 +217,7 @@
     };
     organize(it);
     mem.items.push(it);
+    learnedId = null;
     if (!it.folder_manual) assignFolders([it.id], true);
     return it;
   }
@@ -241,7 +267,7 @@
         if (it && it.id != null && !mem.items.some((i) => i.id === it.id)) mem.items.push(it);
         return { ok: true };
       }
-      if (method === "POST" && path === "/api/items") return { id: addItem(body).id };
+      if (method === "POST" && path === "/api/items") { const it = addItem(body); return { id: it.id, learned: learnedId === it.id }; }
       if (method === "POST" && path === "/api/folders") {
         const name = String(body.name || "").trim().slice(0, 30);
         if (!name) return { error: "名前が空です" };

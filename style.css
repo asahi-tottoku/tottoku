@@ -237,7 +237,13 @@ form button[type=submit] { background: var(--accent); color: var(--on-accent); b
 
 /* ---------- 一覧/地図の切り替え・並べ方 ---------- */
 .viewbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
-#areaSel { flex: 1 1 0; }
+#sortSel { margin-left: auto; }
+.area-bar { padding: 8px 0 2px; }
+.filter-line { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 6px 6px 6px 12px;
+  font-size: 13px; background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; }
+.filter-line .fl-what { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-line .fl-n { flex: none; color: var(--muted, inherit); }
+.filter-line button { flex: none; margin-left: auto; font-size: 12px; padding: 4px 10px; border-radius: 8px; }
 .viewbar select { font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
   border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-width: 0; }
 .seg-sm { flex: none; width: auto; grid-template-columns: repeat(2, auto); }

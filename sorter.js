@@ -236,9 +236,8 @@
 
   const cmp = (a, b) => a[0] - b[0] || a[1] - b[1];
 
-  // items(同じお店をまとめたアイテムのリスト)に合うフォルダの id を返す。決めきれなければ null。
-  // current: 今入っているフォルダの id。同じくらい合う候補にそれが含まれていれば、そのままにする。
-  function pickFolder(items, folderList, current = null) {
+  // いちばんよく合うフォルダの id を全部返す(同じくらい合うものが複数あれば複数。合うものが無ければ空)
+  function topFolders(items, folderList) {
     const texts = items.map(itemTexts);
     const genre = texts.map((t) => t[0]).join(" ");
     const place = texts.map((t) => t[1]).join(" ");
@@ -247,9 +246,16 @@
       const s = folderMatch(f.name, genre, place);
       if (s) scored.push([s, f.id]);
     }
-    if (!scored.length) return null;
+    if (!scored.length) return [];
     const best = scored.reduce((m, x) => (cmp(x[0], m) > 0 ? x[0] : m), scored[0][0]);
-    const top = scored.filter(([s]) => cmp(s, best) === 0).map(([, id]) => id);
+    return scored.filter(([s]) => cmp(s, best) === 0).map(([, id]) => id);
+  }
+
+  // items(同じお店をまとめたアイテムのリスト)に合うフォルダの id を返す。決めきれなければ null。
+  // current: 今入っているフォルダの id。同じくらい合う候補にそれが含まれていれば、そのままにする。
+  function pickFolder(items, folderList, current = null) {
+    const top = topFolders(items, folderList);
+    if (!top.length) return null;
     if (top.length === 1) return top[0];
     if (top.includes(current)) return current;
     return null;
@@ -405,7 +411,7 @@
     return { genres, place };
   }
 
-  const api = { fnorm, GENRES, AREAS, NEIGHBORS, resolveToken, splitName, folderMatch, itemTexts, pickFolder,
+  const api = { fnorm, GENRES, AREAS, NEIGHBORS, resolveToken, splitName, folderMatch, itemTexts, pickFolder, topFolders,
     detectGenres, detectPlace, urlHints, placeFromCoords, areaGroup };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Sorter = api;

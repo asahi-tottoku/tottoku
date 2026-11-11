@@ -4,7 +4,8 @@ const WD = "日月火水木金土";
 let items = [];
 let folders = [];
 let activeFolder = "all";   // "all" | "none" | フォルダid
-let activeGenre = null;      // フォルダの中で選んだジャンル(null = すべて)
+let activeGenre = null;      // 選んだジャンル(null = 全ジャンル)
+let activeArea = "all";      // 選んだ地域("all" | "none" = 地域なし | 地域の名前)
 let hitIds = null;          // (旧「AIに聞く」の名残。今は常に null)
 let view = "list";          // "list" | "map"
 let myPos = null;           // 現在地 {lat, lng}
@@ -74,7 +75,7 @@ function renderFolders() {
     const b = document.createElement("button");
     b.className = "fbtn" + (key === activeFolder ? " on" : "");
     b.innerHTML = `${escapeHtml(label)}<small>${n}</small>`;
-    b.onclick = () => { activeFolder = key; activeGenre = null; render(); };
+    b.onclick = () => { activeFolder = key; render(); };
     if (typeof key === "number") attachFolderPress(b, key);
     box.appendChild(b);
   });
@@ -447,12 +448,18 @@ function compactHours(text) {
   return out.join("\n") + (rest ? "\n" + rest : "");
 }
 
-// ---------------------------------------------------------------- フォルダの中のジャンル分け(自動)
-// フォルダを開くと、中のお店のジャンル(焼肉・寿司…)のボタンを自動で出す。押すとそのジャンルだけ見せる。
-// フォルダは増やさない。ジャンルが2つ以上あるときだけ出す(「御殿場 焼肉」のようなフォルダでは出ない)。
+// ---------------------------------------------------------------- 地域とジャンルで絞り込む(2段のボタン。自動で作る)
+// 1段目が地域(御殿場 4・沼津 2…)、2段目がジャンル(焼肉 3・寿司 1…)。「すべて」でもフォルダの中でも出る。
+// 件数は、もう一方の段・フォルダ・検索で絞ったあとの数。選んでいるボタンをもう一度押すと外れる。
+// フォルダは増やさない。選べるものが2つ以上あるときだけ出す。
 const GENRE_NAMES = new Set(Object.keys(Sorter.GENRES));
 const GENRE_LABEL = { "蕎麦": "蕎麦・うどん", "お好み焼き": "お好み焼き・たこ焼き", "バー": "バー・お酒" };   // ボタンに出す名前(うどんの店も「蕎麦」に入るので)
+const genreMemo = new WeakMap();   // 読み込み直すと作り直される(items の中身が新しくなるので)
 function genreOf(i) {
+  if (!genreMemo.has(i)) genreMemo.set(i, genreOf0(i));
+  return genreMemo.get(i);
+}
+function genreOf0(i) {
   const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
   if (t) return t;
   const d = Sorter.detectGenres([i.title, ...(i.tags || []), i.summary, i.description].join(" "))[0];
@@ -460,48 +467,70 @@ function genreOf(i) {
   const fg = Sorter.detectGenres(folderName(i.folder_id) || "");   // 「イタリアン」フォルダに入れたなら、イタリアン
   return fg.length === 1 ? fg[0] : "その他";
 }
-function renderGenres() {
-  const box = $("#genreBar");
-  box.innerHTML = "";
+// お店の「地域」(無ければ住所)を市区町村ごとにまとめる。地域が分からないものは ""(地域なし)。
+const areaOf = (i) => Sorter.areaGroup(i.area) || Sorter.areaGroup(i.address) || "";
+function inArea(i) {
+  if (activeArea === "all") return true;
+  return activeArea === "none" ? !areaOf(i) : areaOf(i) === activeArea;
+}
+const inGenre = (i) => !activeGenre || genreOf(i) === activeGenre;
+const areaLabel = () => (activeArea === "none" ? "地域なし" : activeArea);
+
+// 選んでいる地域・ジャンルに当たるものが無くなったら(フォルダを変えた・検索した・消した)、外す
+function fixFilters() {
   const q = filterQ();
-  const inside = typeof activeFolder === "number" ? items.filter((i) => inFolder(i) && matches(i, q)) : [];
-  const count = new Map();
-  inside.forEach((i) => { const g = genreOf(i); count.set(g, (count.get(g) || 0) + 1); });
-  if (count.size < 2) { box.hidden = true; activeGenre = null; return; }
-  if (activeGenre && !count.has(activeGenre)) activeGenre = null;
-  const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
-  [[null, "すべて", inside.length], ...order.map(([g, n]) => [g, GENRE_LABEL[g] || g, n])].forEach(([g, label, n]) => {
+  const base = items.filter((i) => inFolder(i) && matches(i, q));
+  if (activeArea !== "all" && !base.some(inArea)) activeArea = "all";
+  if (activeGenre && !base.some((i) => inArea(i) && inGenre(i))) activeGenre = null;
+}
+// rows: [値, 名前, 件数] の並び。cur: 今の値。pick(値): 押したとき
+function chipRow(box, rows, cur, pick) {
+  box.innerHTML = "";
+  rows.forEach(([v, label, n]) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "chip" + (g === activeGenre ? " on" : "");
+    b.className = "chip" + (v === cur ? " on" : "");
     b.innerHTML = `${escapeHtml(label)}<small>${n}</small>`;
-    b.onclick = () => { activeGenre = g; render(); };
+    b.onclick = () => { pick(v); render(); };
     box.appendChild(b);
   });
   box.hidden = false;
 }
-
-// ---------------------------------------------------------------- 地域で絞り込む(自動で選択肢を作る)
-// お店の「地域」(無ければ住所)を市区町村ごとにまとめ、多い順に並べる。地域が分からないものは「地域なし」。
-const areaOf = (i) => Sorter.areaGroup(i.area) || Sorter.areaGroup(i.address) || "";
 function renderAreas() {
-  const sel = $("#areaSel");
-  const cur = sel.value;
+  const box = $("#areaBar");
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q) && (!activeGenre || genreOf(i) === activeGenre));
+  const base = items.filter((i) => inFolder(i) && matches(i, q));
+  if (new Set(base.map(areaOf)).size < 2) { box.hidden = true; box.innerHTML = ""; return; }
+  const shown = base.filter(inGenre);
   const count = new Map();
-  base.forEach((i) => { const a = areaOf(i); count.set(a, (count.get(a) || 0) + 1); });
+  shown.forEach((i) => { const a = areaOf(i); count.set(a, (count.get(a) || 0) + 1); });
   const named = [...count].filter(([a]) => a).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "ja"));
-  const opts = [["all", "📍 全地域"], ...named.map(([a, n]) => [a, `📍 ${a} (${n})`])];
-  if (count.has("")) opts.push(["none", `地域なし (${count.get("")})`]);
-  sel.innerHTML = "";
-  opts.forEach(([v, label]) => { const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o); });
-  sel.value = opts.some(([v]) => v === cur) ? cur : "all";
+  const rows = [["all", "📍 全地域", shown.length], ...named.map(([a, n]) => [a, a, n])];
+  if (count.has("")) rows.push(["none", "地域なし", count.get("")]);
+  chipRow(box, rows, activeArea, (v) => { activeArea = v === activeArea ? "all" : v; });
 }
-function inArea(i) {
-  const a = $("#areaSel").value;
-  if (a === "all") return true;
-  return a === "none" ? !areaOf(i) : areaOf(i) === a;
+function renderGenres() {
+  const box = $("#genreBar");
+  const q = filterQ();
+  const base = items.filter((i) => inFolder(i) && matches(i, q));
+  if (new Set(base.map(genreOf)).size < 2) { box.hidden = true; box.innerHTML = ""; return; }
+  const shown = base.filter(inArea);
+  const count = new Map();
+  shown.forEach((i) => { const g = genreOf(i); count.set(g, (count.get(g) || 0) + 1); });
+  const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
+  const rows = [[null, "🍴 全ジャンル", shown.length], ...order.map(([g, n]) => [g, GENRE_LABEL[g] || g, n])];
+  chipRow(box, rows, activeGenre, (v) => { activeGenre = v === activeGenre ? null : v; });
+}
+// 今の絞り込みを1行で見せる(「📍御殿場 × 🍴焼肉 3件 ✕ 解除」)。地域もジャンルも選んでいなければ出さない
+function renderFilterLine(n) {
+  const box = $("#filterLine");
+  const parts = [];
+  if (activeArea !== "all") parts.push("📍" + areaLabel());
+  if (activeGenre) parts.push("🍴" + (GENRE_LABEL[activeGenre] || activeGenre));
+  box.hidden = !parts.length;
+  if (!parts.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<span class="fl-what">${escapeHtml(parts.join(" × "))}</span><span class="fl-n">${n}件</span><button type="button">✕ 解除</button>`;
+  box.querySelector("button").onclick = () => { activeArea = "all"; activeGenre = null; render(); };
 }
 
 // ---------------------------------------------------------------- 一覧
@@ -529,7 +558,7 @@ const filterQ = () => (searchMode === "web" ? "" : searchText());
 
 function currentList() {
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q) && (!activeGenre || genreOf(i) === activeGenre) && inArea(i));
+  const base = items.filter((i) => inFolder(i) && matches(i, q) && inGenre(i) && inArea(i));
   let list = base;
   if ($("#sortSel").value === "near") list.sort((a, b) => (distKm(a) ?? 1e9) - (distKm(b) ?? 1e9));
   if (hitIds) {
@@ -559,9 +588,11 @@ function renderBackup() {
 function render() {
   renderBackup();
   renderFolders();
-  renderGenres();
+  fixFilters();
   renderAreas();
+  renderGenres();
   const list = currentList();
+  renderFilterLine(list.length);
   document.querySelectorAll("#viewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
   $("#empty").hidden = items.length > 0;
   const ul = $("#list");
@@ -782,7 +813,7 @@ async function saveItem(v, fid) {
   $("#addInput").value = "";
   try {
     const res = await api("/api/items", { method: "POST", body });
-    await afterSave(res.id, fid == null);
+    await afterSave(res.id, fid == null, res.learned);
   } catch (err) {
     toast("保存できませんでした");
   }
@@ -790,7 +821,7 @@ async function saveItem(v, fid) {
 
 // 保存のあと: 入ったフォルダを知らせる。自動で決まらなかったら、どこに入れるかその場で聞く
 // (選んだものは「自分で選んだ」になり、同じ名前・同じチェーンの店を次から同じフォルダに入れる)
-async function afterSave(id, auto) {
+async function afterSave(id, auto, learned = false) {
   await load();
   let it = items.find((x) => x.id === id);
   if (it && auto && !(it.area || areaOf(it))) {   // 地域が分からない → 先に聞く(入れるとフォルダも振り分け直す)
@@ -799,7 +830,8 @@ async function afterSave(id, auto) {
   }
   const where = it && folderName(it.folder_id);
   if (it && !where && auto && folders.length) { openMove(it, true); return; }
-  toast(where ? `「${where}」に保存しました` : "とっとくに保存しました");
+  // learned: 2つのフォルダで迷ったが、前に自分で選んだのと同じ側に入れた
+  toast(where ? `「${where}」に保存しました` + (learned ? "(前と同じ分け方)" : "") : "とっとくに保存しました");
 }
 
 // ---------------------------------------------------------------- Webで探す(AIなし: 同じ言葉でほかのサイトを開くだけ)
@@ -833,7 +865,6 @@ function setSearchMode(m) {
 $("#searchSeg").querySelectorAll("button").forEach((b) => { b.onclick = () => { setSearchMode(b.dataset.mode); $("#filterInput").focus(); }; });
 $("#searchSeg").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.mode === searchMode));
 if (searchMode === "web") $("#filterInput").placeholder = "🌐 Webで探す 例:御殿場 焼肉 個室";
-$("#areaSel").onchange = render;
 $("#sortSel").onchange = async () => {
   setPref("sort", $("#sortSel").value);
   if ($("#sortSel").value === "near" && !myPos) {
@@ -978,7 +1009,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").ca
     history.replaceState(null, "", location.pathname);
     const res = await api("/api/items", { method: "POST",
       body: { url: p.get("url") || "", text: p.get("text") || "", title: p.get("title") || "" } });
-    await afterSave(res.id, true);
+    await afterSave(res.id, true, res.learned);
   } else {
     await load();
   }
