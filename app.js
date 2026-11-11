@@ -631,6 +631,17 @@ function showResults() {
   setTimeout(() => (view === "map" ? $("#mapBox") : $("#list")).scrollIntoView({ behavior: "smooth", block: "start" }), 150);
 }
 
+// タグが地名だけか(「御殿場」「御殿場市」「静岡県」「六本木」)。ジャンルの言葉が入っていれば地名ではない
+function isPlaceTag(tg) {
+  const t = String(tg || "").normalize("NFKC").replace(/\s+/g, "");
+  if (!t || Sorter.detectGenres(t).length) return false;
+  if (/^(北海道|東京都|大阪府|京都府|.{2,3}県)$/.test(t)) return true;
+  const p = Sorter.detectPlace(t);
+  if (!p) return false;
+  const rest = t.replace(p.normalize("NFKC").replace(/\s+/g, ""), "").replace(/^[都道府県]|[都道府県市区町村郡駅周辺エリア]+$/g, "");
+  return rest.length <= 1;
+}
+
 function card(i) {
   const el = $("#cardTpl").content.firstElementChild.cloneNode(true);
   const link = i.url || "#";
@@ -688,7 +699,7 @@ function card(i) {
   }
 
   const tags = el.querySelector(".tags");
-  (i.tags || []).forEach((tg) => {
+  (i.tags || []).filter((tg) => !isPlaceTag(tg)).forEach((tg) => {
     const s = document.createElement("span");
     s.className = "tag"; s.textContent = tg;
     s.onclick = () => { $("#filterInput").value = tg; render(); };
