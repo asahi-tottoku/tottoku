@@ -483,9 +483,10 @@ function fixFilters() {
   if (activeArea !== "all" && !base.some(inArea)) activeArea = "all";
   if (activeGenre && !base.some((i) => inArea(i) && inGenre(i))) activeGenre = null;
 }
-// rows: [値, 名前, 件数] の並び。cur: 今の値。pick(値): 押したとき
-function chipRow(box, rows, cur, pick) {
-  box.innerHTML = "";
+// mark: 段の左端の印(📍・🍴。押せない)。rows: [値, 名前, 件数] の並び。cur: 今の値。pick(値): 押したとき
+// 「全地域」「全ジャンル」のボタンは置かない(選んだボタンをもう一度押すか「✕ 解除」で外れる)
+function chipRow(box, mark, rows, cur, pick) {
+  box.innerHTML = `<span class="chip-mark" aria-hidden="true">${mark}</span>`;
   rows.forEach(([v, label, n]) => {
     const b = document.createElement("button");
     b.type = "button";
@@ -505,9 +506,9 @@ function renderAreas() {
   const count = new Map();
   shown.forEach((i) => { const a = areaOf(i); count.set(a, (count.get(a) || 0) + 1); });
   const named = [...count].filter(([a]) => a).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "ja"));
-  const rows = [["all", "📍 全地域", shown.length], ...named.map(([a, n]) => [a, a, n])];
+  const rows = named.map(([a, n]) => [a, a, n]);
   if (count.has("")) rows.push(["none", "地域なし", count.get("")]);
-  chipRow(box, rows, activeArea, (v) => { activeArea = v === activeArea ? "all" : v; });
+  chipRow(box, "📍", rows, activeArea, (v) => { activeArea = v === activeArea ? "all" : v; });
 }
 function renderGenres() {
   const box = $("#genreBar");
@@ -518,8 +519,8 @@ function renderGenres() {
   const count = new Map();
   shown.forEach((i) => { const g = genreOf(i); count.set(g, (count.get(g) || 0) + 1); });
   const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
-  const rows = [[null, "🍴 全ジャンル", shown.length], ...order.map(([g, n]) => [g, GENRE_LABEL[g] || g, n])];
-  chipRow(box, rows, activeGenre, (v) => { activeGenre = v === activeGenre ? null : v; });
+  const rows = order.map(([g, n]) => [g, GENRE_LABEL[g] || g, n]);
+  chipRow(box, "🍴", rows, activeGenre, (v) => { activeGenre = v === activeGenre ? null : v; });
 }
 // 今の絞り込みを1行で見せる(「📍御殿場 × 🍴焼肉 3件 ✕ 解除」)。地域もジャンルも選んでいなければ出さない
 function renderFilterLine(n) {

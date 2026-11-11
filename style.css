@@ -239,6 +239,7 @@ form button[type=submit] { background: var(--accent); color: var(--on-accent); b
 .viewbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
 #sortSel { margin-left: auto; }
 .area-bar { padding: 8px 0 2px; }
+.chip-mark { flex: none; align-self: center; font-size: 14px; width: 20px; text-align: center; }
 .filter-line { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 6px 6px 6px 12px;
   font-size: 13px; background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; }
 .filter-line .fl-what { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
