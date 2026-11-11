@@ -37,7 +37,7 @@
   <div id="installBar" class="bar" hidden></div>
 
   <form id="addForm" class="add">
-    <input id="addInput" type="text" inputmode="url" placeholder="URLを貼り付けて保存" autocomplete="off">
+    <input id="addInput" type="text" placeholder="お店のURLか名前を貼り付けて保存" autocomplete="off">
     <button type="submit">保存</button>
   </form>
 
@@ -99,6 +99,8 @@
     <button data-theme="dark">ダーク</button>
   </div>
   <p class="set-note">「自動」はスマホやパソコンの設定に合わせます。色の設定は、この端末にだけ保存されます。</p>
+  <p class="set-label">フォルダ</p>
+  <button id="folderSetBtn" class="set-btn">📁 フォルダを作る</button>
   <p class="set-label">データ</p>
   <button id="exportBtn" class="set-btn">⬇ 全部を書き出す(バックアップ用ファイル)</button>
   <button id="importBtn" class="set-btn">⬆ ファイルから読み込む(今のデータと置き換え)</button>

@@ -111,8 +111,10 @@
   const NATIONAL = new Set();   // 全国の表から足した市区町村(文の中から探すときは、よくある言葉を外す)
   const PLACES = [];            // { pref, name, lat, lng } 座標からいちばん近い市区町村を探す用
   let PREF_RE = null;           // 都道府県名・郡名(文から地名を探す前に外す。「長野県北佐久郡軽井沢町」を「長野」「佐久」と間違えない)
+  const PREF_OF = new Map();    // まとめた地域の名前(「御殿場」)→ 都道府県(「静岡県」)。1つに決まるものだけ
   if (root.PLACES_JP) {
     const counties = new Set();
+    const byKey = new Map();    // 市区町村(「御殿場市」)→ その名前がある都道府県
     for (const p of root.PLACES_JP.list) {
       const g = p.name.match(/^(.+?郡)/);
       if (g) counties.add(g[1]);
@@ -122,6 +124,22 @@
       PLACES.push({ pref: p.pref, name, lat: p.lat, lng: p.lng });
       if (!AREAS[key]) { AREAS[key] = []; NATIONAL.add(key); }
       if (m && !AREAS[key].includes(name)) AREAS[key].push(name);
+      if (!byKey.has(key)) byKey.set(key, new Set());
+      byKey.get(key).add(p.pref);
+    }
+    // 同じ名前が複数の県にあるとき: 上の手書きの辞書にある市町(小山町)→ 市・区(川崎市。川崎町より先)→ それ以外、の順に見て、
+    // その中で県が1つならそれに決める。2つ以上(府中・伊達)なら決めない
+    const cand = new Map();
+    for (const [key, ps] of byKey) {
+      const g = bare(key);
+      if (!cand.has(g)) cand.set(g, [new Set(), new Set(), new Set()]);
+      const c = cand.get(g);
+      const rank = !NATIONAL.has(key) ? 0 : /[市区]$/.test(key) ? 1 : 2;
+      ps.forEach((x) => c[rank].add(x));
+    }
+    for (const [g, c] of cand) {
+      const first = c.find((s) => s.size);
+      if (first.size === 1) PREF_OF.set(g, [...first][0]);
     }
     PREF_RE = new RegExp([...root.PLACES_JP.prefs, ...counties].map((s) => s.normalize("NFKC")).join("|"), "g");
   }
@@ -356,6 +374,21 @@
     return out;
   }
 
+  // 都道府県を調べる(Web版だけ。全国の表が無いときは、いつも "")
+  // prefOf: areaGroup の答え(「御殿場」)→「静岡県」。同じ名前が複数の県にあって決まらないときは ""
+  const prefOf = (group) => PREF_OF.get(String(group || "")) || "";
+  // prefIn: 文(住所)に書いてある都道府県。いちばん前にあるもの(「東京都府中市」を「京都府」と間違えない)
+  function prefIn(text) {
+    if (!root.PLACES_JP) return "";
+    const s = String(text || "").normalize("NFKC");
+    let best = "", at = -1;
+    for (const p of root.PLACES_JP.prefs) {
+      const k = s.indexOf(p);
+      if (k >= 0 && (at < 0 || k < at)) { best = p; at = k; }
+    }
+    return best;
+  }
+
   // 座標から、いちばん近い市区町村の名前(「御殿場市」「港区」「横浜市中区」)。表が無いか、25km より遠ければ ""
   function placeFromCoords(lat, lng) {
     if (!PLACES.length || lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return "";
@@ -412,7 +445,7 @@
   }
 
   const api = { fnorm, GENRES, AREAS, NEIGHBORS, resolveToken, splitName, folderMatch, itemTexts, pickFolder, topFolders,
-    detectGenres, detectPlace, urlHints, placeFromCoords, areaGroup };
+    detectGenres, detectPlace, urlHints, placeFromCoords, areaGroup, prefOf, prefIn };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Sorter = api;
 })(typeof self !== "undefined" ? self : this);

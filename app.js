@@ -6,6 +6,7 @@ let folders = [];
 let activeFolder = "all";   // "all" | "none" | フォルダid
 let activeGenre = null;      // 選んだジャンル(null = 全ジャンル)
 let activeArea = "all";      // 選んだ地域("all" | "none" = 地域なし | 地域の名前)
+let activePref = "all";      // 選んだ都道府県("all" | "none" = 県が分からない | 「静岡県」)。県が2つ以上あるときだけ使う
 let hitIds = null;          // (旧「AIに聞く」の名残。今は常に null)
 let view = "list";          // "list" | "map"
 let myPos = null;           // 現在地 {lat, lng}
@@ -66,6 +67,9 @@ async function createFolder() {
 function renderFolders() {
   const box = $("#folders");
   box.innerHTML = "";
+  // フォルダが1つも無いときは、段ごと出さない(作るのは 設定 →「フォルダを作る」)
+  box.parentElement.hidden = !folders.length;
+  if (!folders.length) { if (activeFolder !== "all") activeFolder = "all"; return; }
   const q = filterQ();
   const count = (fn) => items.filter((i) => matches(i, q) && fn(i)).length;
   const entries = [["all", "すべて", count(() => true)]];
@@ -81,7 +85,7 @@ function renderFolders() {
   });
   // フォルダの操作は「⋯」ボタン(と、フォルダの長押し)のメニューにまとめる
   const more = $("#folderMore");   // 右端に固定(横にスクロールしても隠れない)
-  more.textContent = folders.length ? "⋯" : "+ フォルダ";
+  more.textContent = "⋯";
   more.onclick = () => openFolderMenu(null);
 }
 
@@ -469,17 +473,38 @@ function genreOf0(i) {
 }
 // お店の「地域」(無ければ住所)を市区町村ごとにまとめる。地域が分からないものは ""(地域なし)。
 const areaOf = (i) => Sorter.areaGroup(i.area) || Sorter.areaGroup(i.address) || "";
+// お店の都道府県。住所に書いてあればそれ、無ければ地域の名前から。地域なし = ""、地域はあるが県が決まらない = "none"
+const prefMemo = new WeakMap();
+function prefKey(i) {
+  if (!prefMemo.has(i)) {
+    const a = areaOf(i);
+    prefMemo.set(i, a ? Sorter.prefIn(i.address) || Sorter.prefOf(a) || "none" : "");
+  }
+  return prefMemo.get(i);
+}
+const prefLabel = (p) => (p === "none" ? "県が分からない" : p === "北海道" ? p : p.slice(0, -1));   // 「静岡県」→「静岡」
+// 県が2つ以上あるときだけ、地域の段を「県 → 市」の2段にする
+const manyPrefs = (list) => new Set(list.map(prefKey).filter((p) => p && p !== "none")).size >= 2;
 function inArea(i) {
+  if (activePref !== "all" && prefKey(i) !== activePref) return false;
   if (activeArea === "all") return true;
   return activeArea === "none" ? !areaOf(i) : areaOf(i) === activeArea;
 }
 const inGenre = (i) => !activeGenre || genreOf(i) === activeGenre;
-const areaLabel = () => (activeArea === "none" ? "地域なし" : activeArea);
+const areaLabel = () => (activeArea === "none" ? "地域なし" : activeArea !== "all" ? activeArea : prefLabel(activePref));
+const areaPicked = () => activeArea !== "all" || activePref !== "all";
 
 // 選んでいる地域・ジャンルに当たるものが無くなったら(フォルダを変えた・検索した・消した)、外す
 function fixFilters() {
   const q = filterQ();
   const base = items.filter((i) => inFolder(i) && matches(i, q));
+  if (!manyPrefs(base)) activePref = "all";
+  else if (activePref === "all" && activeArea !== "all" && activeArea !== "none") {
+    // 市を選んだまま、県が2つ以上ある所へ移った: その市の県を選んだことにする(段の表示と合わせる)
+    const hit = base.find((i) => areaOf(i) === activeArea);
+    if (hit) activePref = prefKey(hit);
+  }
+  if (activePref !== "all" && !base.some((i) => prefKey(i) === activePref)) activePref = "all";
   if (activeArea !== "all" && !base.some(inArea)) activeArea = "all";
   if (activeGenre && !base.some((i) => inArea(i) && inGenre(i))) activeGenre = null;
 }
@@ -502,13 +527,34 @@ function renderAreas() {
   const q = filterQ();
   const base = items.filter((i) => inFolder(i) && matches(i, q));
   if (new Set(base.map(areaOf)).size < 2) { box.hidden = true; box.innerHTML = ""; return; }
+  const tally = (list, keyOf) => {
+    const count = new Map();
+    list.forEach((i) => { const k = keyOf(i); count.set(k, (count.get(k) || 0) + 1); });
+    return count;
+  };
+  const byN = (x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "ja");
   const shown = base.filter(inGenre);
-  const count = new Map();
-  shown.forEach((i) => { const a = areaOf(i); count.set(a, (count.get(a) || 0) + 1); });
-  const named = [...count].filter(([a]) => a).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "ja"));
-  const rows = named.map(([a, n]) => [a, a, n]);
+  if (manyPrefs(base) && activePref === "all") {
+    // 1段目: 県(東京 12・静岡 8)。押すと、その県の市区町村だけになる
+    const count = tally(shown, prefKey);
+    const rows = [...count].filter(([p]) => p && p !== "none").sort(byN).map(([p, n]) => ["p:" + p, prefLabel(p), n]);
+    if (count.has("none")) rows.push(["p:none", "県が分からない", count.get("none")]);
+    if (count.has("")) rows.push(["none", "地域なし", count.get("")]);
+    chipRow(box, "📍", rows, activeArea, (v) => {
+      if (v.startsWith("p:")) { activePref = v.slice(2); activeArea = "all"; }
+      else activeArea = v === activeArea ? "all" : v;
+    });
+    return;
+  }
+  const count = tally(shown.filter((i) => activePref === "all" || prefKey(i) === activePref), areaOf);
+  const rows = [...count].filter(([a]) => a).sort(byN).map(([a, n]) => [a, a, n]);
   if (count.has("")) rows.push(["none", "地域なし", count.get("")]);
-  chipRow(box, "📍", rows, activeArea, (v) => { activeArea = v === activeArea ? "all" : v; });
+  // 県を選んでいるときは、先頭に「‹ 静岡」(押すと県の一覧に戻る)
+  if (activePref !== "all") rows.unshift(["back", "‹ " + prefLabel(activePref), base.filter((i) => inGenre(i) && prefKey(i) === activePref).length]);
+  chipRow(box, "📍", rows, activePref !== "all" && activeArea === "all" ? "back" : activeArea, (v) => {
+    if (v === "back") { activePref = "all"; activeArea = "all"; }
+    else activeArea = v === activeArea ? "all" : v;
+  });
 }
 function renderGenres() {
   const box = $("#genreBar");
@@ -526,12 +572,12 @@ function renderGenres() {
 function renderFilterLine(n) {
   const box = $("#filterLine");
   const parts = [];
-  if (activeArea !== "all") parts.push("📍" + areaLabel());
+  if (areaPicked()) parts.push("📍" + areaLabel());
   if (activeGenre) parts.push("🍴" + (GENRE_LABEL[activeGenre] || activeGenre));
   box.hidden = !parts.length;
   if (!parts.length) { box.innerHTML = ""; return; }
   box.innerHTML = `<span class="fl-what">${escapeHtml(parts.join(" × "))}</span><span class="fl-n">${n}件</span><button type="button">✕ 解除</button>`;
-  box.querySelector("button").onclick = () => { activeArea = "all"; activeGenre = null; render(); };
+  box.querySelector("button").onclick = () => { activeArea = "all"; activePref = "all"; activeGenre = null; render(); };
 }
 
 // ---------------------------------------------------------------- 一覧
@@ -992,7 +1038,11 @@ $("#importFile").onchange = async (e) => {
   } catch (err) { toast(err.message || "読み込めませんでした"); }
 };
 
-$("#settingsBtn").onclick = () => { renderSettings(); $("#settingsDlg").showModal(); };
+$("#settingsBtn").onclick = () => {
+  $("#folderSetBtn").textContent = folders.length ? "📁 フォルダの管理(作る・並べ替え・振り分け)" : "📁 フォルダを作る";
+  renderSettings(); $("#settingsDlg").showModal();
+};
+$("#folderSetBtn").onclick = () => { $("#settingsDlg").close(); openFolderMenu(null); };
 $("#settingsClose").onclick = () => $("#settingsDlg").close();
 applyLook(getLook());
 

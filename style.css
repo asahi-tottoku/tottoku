@@ -148,6 +148,7 @@ form button[type=submit] { background: var(--accent); color: var(--on-accent); b
   padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
 }
 .folderbar { margin: 16px 0 0; }
+.folderbar[hidden] { display: none; }
 .folders { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .folders::-webkit-scrollbar { display: none; }
 .fbtn {
