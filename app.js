@@ -880,9 +880,11 @@ function startSave() {
   if (dlg.contains(document.activeElement)) document.activeElement.blur();   // 開いただけでキーボードを出さない(フォルダの一覧が隠れる)
 }
 // メモらしい文: 長い・文になっている(句点や「?」)もので、料理のジャンルも地名も入っていない
-const memoLike = (v) => (v.length >= 25 || /[。!?!?]/.test(v)) && !Sorter.detectGenres(v).length && !Sorter.detectPlace(v);
+// メモらしい文: 「。」「?」があり、ひらがなが入った8文字以上の文で、料理のジャンルも地名も無い。
+// 長いだけの名前・「!」の付く店名(「やよい軒!」)・短い名前(「モーニング娘。」)には印を付けない
+const memoLike = (v) => /[。??]/.test(v) && /[ぁ-ん]/.test(v) && v.length >= 8 && !Sorter.detectGenres(v).length && !Sorter.detectPlace(v);
 $("#addForm").onsubmit = (e) => { e.preventDefault(); startSave(); };
-$("#saveTitleInput").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } };   // 「完了」でキーボードを閉じる
+$("#saveTitleInput").onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); e.target.blur(); } };   // 「完了」でキーボードを閉じる
 
 async function saveItem(v, fid, extra = {}) {
   const body = /^https?:\/\//.test(v) ? (bareUrl(v) ? { url: v, name: extra.name || "" } : { url: "", text: v }) : { text: v };
@@ -925,8 +927,10 @@ async function checkClip() {
   } catch (e) { return; }   // iPhone など、調べられない所では何もしない(📋 ボタンを使う)
   const t = await readClip();
   const url = ((t || "").match(/https?:\/\/\S+/) || [""])[0];
-  if (!url || url === getPref("clipSeen", "") || items.some((i) => i.url === url)) { bar.hidden = true; return; }
-  const seen = () => { setPref("clipSeen", url); bar.hidden = true; };
+  // 一度「保存」「✕」を押したURL(新しい20個まで、改行で区切って覚える)
+  const seenList = getPref("clipSeen", "").split("\n").filter(Boolean);
+  if (!url || seenList.includes(url) || items.some((i) => i.url === url)) { bar.hidden = true; return; }
+  const seen = () => { setPref("clipSeen", [url, ...seenList].slice(0, 20).join("\n")); bar.hidden = true; };
   bar.innerHTML = `<span>📋 コピーしたURLがあります<br><small>${escapeHtml(url.replace(/^https?:\/\/(www\.)?/, ""))}</small></span>
     <button type="button" class="go">保存</button><button type="button" class="bar-close" aria-label="閉じる">✕</button>`;
   bar.querySelector(".go").onclick = () => { seen(); $("#addInput").value = oneLine(t); startSave(); };

@@ -83,9 +83,12 @@
 
   function categoryOf(h, url, genres) {
     // 買い物・動画・レシピのサイトは、ジャンルの言葉があってもそちらを優先する
-    if (/amazon|rakuten|yahoo|mercari/.test(h)) return "買い物";
+    // 買い物は、売り場のページだけ(Yahoo!ニュース・楽天トラベル・Amazon の動画などは買い物にしない)
+    if (/mercari|paypayfleamarket/.test(h) || /^(www|item|books|product|search)\.rakuten\.co\.jp$/.test(h)
+      || /(^|\.)(shopping|auctions)\.yahoo\.co\.jp$/.test(h)
+      || (/(^|\.)amazon\.|(^|\.)amzn\./.test(h) && !/\/(gp\/video|prime-?video)/i.test(url))) return "買い物";
     if (/youtube|youtu\.be|tiktok/.test(h)) return "動画";
-    if (/cookpad|kurashiru|delishkitchen/.test(h)) return "レシピ";
+    if (/cookpad|kurashiru|delishkitchen|^recipe\.rakuten\./.test(h)) return "レシピ";
     if (genres.length || /tabelog|hotpepper|retty|gnavi|ikyu|hitosara/.test(h)) return "飲食店";
     if (/google\./.test(h) && /\/maps|maps\.app/.test(url) || /maps\.app\.goo\.gl/.test(h)) return "お出かけ";
     return "その他";
@@ -156,6 +159,7 @@
   // false のものには、地域を聞かない・カードに「📍」を出さない・ジャンルの段では「その他」に数える。
   // 分類が「その他」のものは、URLが無い(名前だけ)か Google のリンク(共有リンクは名前しか届かない)なら、お店かもしれないので場所として扱う。
   function isPlace(i) {
+    if (i.category === "メモ") return false;   // メモは、文に地名が入っていても場所ではない
     if (i.lat != null || i.area || i.address) return true;
     if (i.category === "飲食店" || i.category === "お出かけ") return true;
     return i.category === "その他" && (!i.url || /(^|\.)google(\.|$)|goo\.gl$/.test(i.site || ""));
@@ -176,19 +180,32 @@
   const PREF_RE = /^(北海道|青森|岩手|宮城|秋田|山形|福島|茨城|栃木|群馬|埼玉|千葉|東京|神奈川|新潟|富山|石川|福井|山梨|長野|岐阜|静岡|愛知|三重|滋賀|京都|大阪|兵庫|奈良|和歌山|鳥取|島根|岡山|広島|山口|徳島|香川|愛媛|高知|福岡|佐賀|長崎|熊本|大分|宮崎|鹿児島|沖縄)[都府県]?$/;
   const plainWords = (name) => String(name || "").split(/[\s・、,\/]+/)
     .filter((t) => t && !PREF_RE.test(t) && !S.detectPlace(t) && !S.detectGenres(t).length);
+  // 地名・都道府県・料理のジャンルの言葉が入ったフォルダ(「沼津 ランチ」「東京 動画」)。お店のフォルダなので、
+  // 下の3つ(フォルダ名の言葉・種類・同じサイト)では相手にしない(地名を見ずに、サイトや動画を黙って入れないため)
+  const placeFolder = (name) => String(name || "").split(/[\s・、,\/]+/)
+    .some((t) => t && (PREF_RE.test(t) || S.detectPlace(t) || S.detectGenres(t).length));
   const isAscii = (t) => /^[\x00-\x7f]+$/.test(t);
-  const folderTokens = (name) => plainWords(name).map((t) => (isAscii(t) ? t.toLowerCase() : norm(t)))
+  const isKana = (t) => /^[ァ-ヶー]+$/.test(t);
+  // 言葉をさがす用(norm と違い「ー」を残す。「ビール」を「森ビル」に合わせない)
+  const normW = (s) => String(s || "").normalize("NFKC").replace(/[\s・\-()\[\]【】「」]/g, "").toLowerCase();
+  const folderTokens = (name) => plainWords(name).map((t) => (isAscii(t) ? t.toLowerCase() : normW(t)))
     .filter((t) => t.length >= (isAscii(t) ? 3 : 2));
-  // 英字の言葉は、単語として入っているときだけ(「note」を「Keynote」に合わせない)
-  const hasToken = (t, hay, raw) => (isAscii(t)
-    ? new RegExp("(^|[^a-z0-9])" + t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z0-9]|$)").test(raw) : hay.includes(t));
+  const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // 英字の言葉は、単語として入っているときだけ(「note」を「Keynote」に合わせない)。
+  // カタカナの言葉は、すぐ後ろにカタカナが続かないときだけ(「メモ」を「メモリ」に合わせない)
+  const hasToken = (t, hay, raw) => (isAscii(t) ? new RegExp("(^|[^a-z0-9])" + reEsc(t) + "([^a-z0-9]|$)").test(raw)
+    : isKana(t) ? new RegExp(reEsc(t) + "(?![ァ-ヶー])").test(raw) : hay.includes(t));
   // フォルダ名の言葉が、名前・説明(場所でないものはサイト名も)に入っているフォルダ。いちばん多く合う1つだけ。同数なら決めない
-  function nameFolder(r, fl) {
+  function tokenHits(r) {
     const h = (r.site || "").replace(/^www\./, "");
     const names = isPlace(r) ? "" : [h, ...SITE_NAMES.filter(([re]) => re.test(h)).map(([, n]) => n)].join(" ");
     const raw = [r.title, r.description, names].join(" ").normalize("NFKC").toLowerCase();
-    const hay = norm(raw);
-    const score = fl.map((f) => [f.id, folderTokens(f.name).filter((t) => hasToken(t, hay, raw)).length]).filter(([, n]) => n)
+    const hay = normW(raw);
+    return (f) => folderTokens(f.name).filter((t) => hasToken(t, hay, raw)).length;
+  }
+  function nameFolder(r, fl) {
+    const hits = tokenHits(r);
+    const score = fl.filter((f) => !placeFolder(f.name)).map((f) => [f.id, hits(f)]).filter(([, n]) => n)
       .sort((a, b) => b[1] - a[1]);
     if (!score.length || (score[1] && score[1][1] === score[0][1])) return null;
     return score[0][0];
@@ -198,19 +215,20 @@
     // 分類が「その他」のサイトは、お店の公式サイトかもしれないので決めない(2026-11-24 きよさん「聞く」)
     const re = KIND_WORDS[r.category];
     if (!re) return null;
-    // 地名・料理のジャンルの言葉は見ない(「沼津 中華料理」にレシピを入れない)
-    const hit = fl.filter((f) => re.test(plainWords(f.name).join(" ").normalize("NFKC").toLowerCase()));
+    // 地名・料理のジャンルの入ったフォルダは見ない(「沼津 中華料理」にレシピを、「東京 動画」に動画を入れない)
+    const hit = fl.filter((f) => !placeFolder(f.name) && re.test(String(f.name).normalize("NFKC").toLowerCase()));
     return hit.length === 1 ? hit[0].id : null;
   }
-  // 同じサイトのものが入っているフォルダ(多いほう。同数なら決めない)。manualOnly: 自分で入れたものだけ数える。
-  // お店として入っているものは数えない。何でも載るサイト(インスタ・YouTube など)は、自分で入れたものだけ数える
-  function siteFolder(r, all, fids, manualOnly) {
+  // 自分で同じサイトのものを入れたフォルダ(多いほう。同数なら決めない)。自動で入ったものは数えない。
+  // お店として入っているもの・地名やジャンルの入ったフォルダも数えない。
+  // 何でも載るサイト(インスタ・YouTube・Amazon など)は、同じサイトというだけでは決めない
+  function siteFolder(r, all, fl) {
     const h = (r.site || "").replace(/^www\./, "");
-    if (!h) return null;
-    if (SITE_NAMES.some(([re]) => re.test(h))) manualOnly = true;
+    if (!h || SITE_NAMES.some(([re]) => re.test(h))) return null;
+    const fids = new Set(fl.filter((f) => !placeFolder(f.name)).map((f) => f.id));
     const votes = new Map();
     for (const o of all) {
-      if (o.id === r.id || !fids.has(o.folder_id) || (manualOnly && !o.folder_manual) || isPlace(o)) continue;
+      if (o.id === r.id || !fids.has(o.folder_id) || !o.folder_manual || isPlace(o)) continue;
       if ((o.site || "").replace(/^www\./, "") === h) votes.set(o.folder_id, (votes.get(o.folder_id) || 0) + 1);
     }
     const order = [...votes].sort((a, b) => b[1] - a[1]);
@@ -243,8 +261,14 @@
         const cur = (rows.find((r) => fids.has(r.folder_id)) || {}).folder_id ?? null;
         // お店以外(サイト・動画・買い物): フォルダ名の言葉が題名やサイト名にある → 自分で同じサイトを入れたフォルダ、を先に見る
         const site = rows.every((r) => !isPlace(r));
-        if (site) fid = nameFolder(rows[0], fl) ?? siteFolder(rows[0], all, fids, true);
-        if (fid == null) fid = S.pickFolder(rows, fl, cur);
+        if (site) fid = nameFolder(rows[0], fl) ?? siteFolder(rows[0], all, fl);
+        if (fid == null) {
+          fid = S.pickFolder(rows, fl, cur);
+          // お店以外: 辞書は文字の一部でも合わせる(「note」に「Keynote」、「メモ」に「メモリ」)。
+          // 地名・ジャンルの無いフォルダへは、言葉として合っているときだけ入れる(合わなければ決めずに聞く)
+          const f = site && fid != null && fid !== cur && fl.find((x) => x.id === fid);
+          if (f && !placeFolder(f.name) && !tokenHits(rows[0])(f)) fid = null;
+        }
         if (fid == null && newItem) {
           const ids2 = new Set(rows.map((r) => r.id));
           const others = same.filter((r) => !ids2.has(r.id));
@@ -257,9 +281,9 @@
           }
         }
         if (fid == null && S.topFolders(rows, fl).length < 2) {   // 辞書で迷っているとき(2つ以上)は決めずに聞く
-          // お店以外: 種類に合うフォルダ → (新しく保存したとき)同じサイトのものがあるフォルダ。お店: フォルダ名の言葉が名前にある
+          // お店以外: 種類に合うフォルダ(動画 →「見る」など)
           // (お店には足さない。前は聞いていたお店を、地名・ジャンルの合わないフォルダへ黙って入れないため)
-          if (site) fid = kindFolder(rows[0], fl) ?? (newItem ? siteFolder(rows[0], all, fids, false) : null);
+          if (site) fid = kindFolder(rows[0], fl);
         }
         if (fid == null) {
           fid = learnedFolder(rows, fl, all, sigs);
