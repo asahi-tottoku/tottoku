@@ -6,7 +6,7 @@
   "use strict";
   const S = root.Sorter;
   const DB_NAME = "tottoku-web", STORE = "kv", KEY = "state";
-  const CATEGORIES = ["飲食店", "お出かけ", "買い物", "記事", "動画", "レシピ", "その他"];
+  const CATEGORIES = ["飲食店", "お出かけ", "買い物", "記事", "動画", "レシピ", "メモ", "その他"];
   const URL_RE = /https?:\/\/[^\s<>"']+/;
 
   // ---------------------------------------------------------------- 端末の中の保存場所(IndexedDB)
@@ -170,6 +170,7 @@
     "買い物": /買い物|買物|かいもの|ほしい|欲しい|ショッピング|買う|購入/,
     "レシピ": /レシピ|料理|作る|自炊/,
     "記事": /読む|よむ|記事|ブログ|ニュース|読み物|読みもの|サイト|リンク|ブックマーク/,
+    "メモ": /メモ|めも|ノート|覚え書き|おぼえがき|やること|todo/,
   };
   // フォルダ名の言葉。地名・料理のジャンル(辞書が分かる言葉)は外す(それは辞書の仕事。「御殿場 寿司」に御殿場のパン屋を入れない)
   const PREF_RE = /^(北海道|青森|岩手|宮城|秋田|山形|福島|茨城|栃木|群馬|埼玉|千葉|東京|神奈川|新潟|富山|石川|福井|山梨|長野|岐阜|静岡|愛知|三重|滋賀|京都|大阪|兵庫|奈良|和歌山|鳥取|島根|岡山|広島|山口|徳島|香川|愛媛|高知|福岡|佐賀|長崎|熊本|大分|宮崎|鹿児島|沖縄)[都府県]?$/;
@@ -194,7 +195,8 @@
   }
   // 種類に合う名前のフォルダ(動画 →「あとで見る動画」、ふつうのサイト →「あとで読む」)。1つだけ合うときに決める
   function kindFolder(r, fl) {
-    const re = KIND_WORDS[r.category] || (r.category === "その他" && r.url ? KIND_WORDS["記事"] : null);
+    // 分類が「その他」のサイトは、お店の公式サイトかもしれないので決めない(2026-11-24 きよさん「聞く」)
+    const re = KIND_WORDS[r.category];
     if (!re) return null;
     // 地名・料理のジャンルの言葉は見ない(「沼津 中華料理」にレシピを入れない)
     const hit = fl.filter((f) => re.test(plainWords(f.name).join(" ").normalize("NFKC").toLowerCase()));
@@ -279,7 +281,7 @@
 
   // ---------------------------------------------------------------- 保存
   // name: 保存の画面で自分で付けた名前(そのまま名前にする)。title: 共有メニューから届いたページの題名(サイト名の飾りを外す)
-  function addItem({ url = "", text = "", title = "", name = "", folder_id = null }) {
+  function addItem({ url = "", text = "", title = "", name = "", note = "", kind = "", folder_id = null }) {
     url = String(url || "").trim();
     name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 120);
     text = [name || title, text].filter(Boolean).join("\n").trim();
@@ -294,6 +296,8 @@
     };
     organize(it);
     if (name) it.title = name;   // 「歌手 - 曲」の「 - 曲」を飾りとして切らない
+    if (kind === "memo") it.category = "メモ";   // 保存の画面で「メモとして保存」を選んだ(お店・場所ではない)
+    it.note = String(note || "").trim().slice(0, 1000);   // 保存の画面で書いたメモ
     mem.items.push(it);
     learnedId = null;
     namedId = null;

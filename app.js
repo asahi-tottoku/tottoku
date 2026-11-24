@@ -1,5 +1,5 @@
 const $ = (s) => document.querySelector(s);
-const ICONS = { "飲食店": "🍽", "お出かけ": "📍", "買い物": "🛍", "記事": "📰", "動画": "▶", "レシピ": "🍳", "その他": "🔖" };
+const ICONS = { "飲食店": "🍽", "お出かけ": "📍", "買い物": "🛍", "記事": "📰", "動画": "▶", "レシピ": "🍳", "メモ": "📝", "その他": "🔖" };
 const WD = "日月火水木金土";
 let items = [];
 let folders = [];
@@ -834,7 +834,7 @@ async function renderMap(list) {
 // ---------------------------------------------------------------- 入力
 // 保存: 「保存」を押したら、フォルダを選ぶ画面を出してから保存する。
 // URLだけのときは、その画面に名前の欄も出す(通信しないので題名を取れず、そのままだとサイト名になるため)。
-// フォルダが無くて名前も聞かないときは、そのまま保存する。
+// メモの欄はいつも出す。URLの無い文のときは「メモとして保存」も選べる(種類が「メモ」になり、地域を聞かない)。
 const bareUrl = (v) => /^https?:\/\/\S+$/.test(v);
 const needsName = (v) => bareUrl(v) && !/google\.[^/]+\/maps\/place\//.test(v);   // マップの場所のURLは名前が入っている
 function startSave() {
@@ -843,14 +843,20 @@ function startSave() {
   $("#addInput").blur();
   $("#clipBar").hidden = true;
   const ask = needsName(v);
-  if (!folders.length && !ask) { saveItem(v, null); return; }
   const dlg = $("#saveDlg");
   $("#saveHead").textContent = folders.length ? "どのフォルダに入れますか?" : "保存します";
   $("#saveName").textContent = v.length > 60 ? v.slice(0, 60) + "…" : v;
   const nameIn = $("#saveTitleInput");
   nameIn.hidden = !ask;
   nameIn.value = "";
-  const name = () => (ask ? nameIn.value.trim() : "");
+  // メモの欄(いつも出す)と、「メモとして保存」(URLの無い文のときだけ。メモらしい文なら最初から印を付ける)
+  const noteIn = $("#saveNoteInput"), memoChk = $("#saveMemoChk");
+  noteIn.value = "";
+  const hasUrl = /https?:\/\//.test(v);
+  $("#saveMemoRow").hidden = hasUrl;
+  memoChk.checked = !hasUrl && memoLike(v);
+  // 保存の画面で入れたもの: 名前(URLだけのとき)・メモ・メモとして保存するか
+  const name = () => ({ name: ask ? nameIn.value.trim() : "", note: noteIn.value.trim(), kind: !hasUrl && memoChk.checked ? "memo" : "" });
   const list = $("#saveList");
   list.innerHTML = "";
   const opt = (label, fid, cls = "") => {
@@ -871,14 +877,18 @@ function startSave() {
     if (id) { await load(); saveItem(v, id, nm); }
   };
   dlg.showModal();
-  if (document.activeElement === nameIn) nameIn.blur();   // 開いただけでキーボードを出さない(フォルダの一覧が隠れる)
+  if (dlg.contains(document.activeElement)) document.activeElement.blur();   // 開いただけでキーボードを出さない(フォルダの一覧が隠れる)
 }
+// メモらしい文: 長い・文になっている(句点や「?」)もので、料理のジャンルも地名も入っていない
+const memoLike = (v) => (v.length >= 25 || /[。!?!?]/.test(v)) && !Sorter.detectGenres(v).length && !Sorter.detectPlace(v);
 $("#addForm").onsubmit = (e) => { e.preventDefault(); startSave(); };
 $("#saveTitleInput").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } };   // 「完了」でキーボードを閉じる
 
-async function saveItem(v, fid, name = "") {
-  const body = /^https?:\/\//.test(v) ? (bareUrl(v) ? { url: v, name } : { url: "", text: v }) : { text: v };
+async function saveItem(v, fid, extra = {}) {
+  const body = /^https?:\/\//.test(v) ? (bareUrl(v) ? { url: v, name: extra.name || "" } : { url: "", text: v }) : { text: v };
   body.folder_id = fid;
+  body.note = extra.note || "";
+  body.kind = extra.kind || "";
   $("#addInput").value = "";
   try {
     const res = await api("/api/items", { method: "POST", body });

@@ -130,6 +130,8 @@
   <p id="saveHead" class="sheet-title">どのフォルダに入れますか?</p>
   <p id="saveName" class="sheet-sub"></p>
   <input id="saveTitleInput" type="text" class="field save-title" placeholder="名前を付ける(あとでも直せます)" autocomplete="off" enterkeyhint="done" maxlength="120" hidden>
+  <textarea id="saveNoteInput" class="field save-note" rows="1" maxlength="1000" placeholder="メモ(入れなくてもOK)"></textarea>
+  <label id="saveMemoRow" class="save-memo" hidden><input type="checkbox" id="saveMemoChk"> 📝 メモとして保存(お店・場所ではない)</label>
   <div id="saveList" class="sheet-list"></div>
   <button id="saveNew" class="sheet-new">+ 新しいフォルダを作って入れる</button>
   <button class="sheet-cancel" onclick="this.closest('dialog').close()">やめる</button>

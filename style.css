@@ -348,7 +348,11 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 #clipBar .go { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 700; font-size: 13px; padding: 5px 12px; }
 #clipBar .bar-close { background: none; border: none; font-size: 18px; padding: 2px 6px; color: inherit; }
 .add .paste-btn { flex: none; padding-left: 10px; padding-right: 10px; }
-.save-title { margin-bottom: 12px; }
+.save-title { margin-bottom: 8px; }
+.save-note { margin-bottom: 10px; resize: none; }
+.save-memo { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 14px; }
+.save-memo[hidden] { display: none; }
+.save-memo input { width: 18px; height: 18px; accent-color: var(--accent); }
 #installBar { display: flex; align-items: center; gap: 8px; }
 #installBar span { flex: 1; min-width: 0; font-size: 13px; }
 #installBar .bar-close { flex: none; background: none; border: none; font-size: 18px; padding: 2px 6px; color: inherit; }
