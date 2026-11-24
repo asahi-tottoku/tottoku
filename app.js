@@ -67,7 +67,7 @@ function escapeHtml(s) {
 
 // ---------------------------------------------------------------- フォルダ
 async function createFolder() {
-  const name = (prompt("新しいフォルダの名前(例:行きたい店、接待用、旅行)") || "").trim();
+  const name = (prompt("新しいフォルダの名前(例:行きたい店、あとで読む、旅行)") || "").trim();
   if (!name) return null;
   const res = await api("/api/folders", { method: "POST", body: { name } });
   if (res.error) { toast(res.error); return null; }
@@ -356,7 +356,7 @@ function openArea(item, ask = false) {
   const dlg = $("#areaDlg");
   const input = $("#areaOnlyInput");
   const head = dlg.querySelector(".sheet-title");
-  head.textContent = ask ? "地域が分かりませんでした。\nどこのお店ですか?" : "📍 地域";
+  head.textContent = ask ? "地域が分かりませんでした。\nどこにありますか?" : "📍 地域";
   head.style.whiteSpace = "pre-line";
   $("#areaCancel").textContent = ask ? "あとで" : "閉じる";
   let finish = () => {};
@@ -475,7 +475,16 @@ function genreOf(i) {
   if (!genreMemo.has(i)) genreMemo.set(i, genreOf0(i));
   return genreMemo.get(i);
 }
+// 場所(お店・お出かけ先)かどうか。サイト・動画・買い物などは false。
+// false のものには、地域を聞かない・カードに「📍」を出さない・ジャンルの段では「その他」に数える。
+// 分類が「その他」のものは、URLが無い(名前だけ)か Google のリンク(共有リンクは名前しか届かない)なら、お店かもしれないので場所として扱う。
+function isPlace(i) {
+  if (i.lat != null || i.area || i.address) return true;
+  if (i.category === "飲食店" || i.category === "お出かけ") return true;
+  return i.category === "その他" && (!i.url || /(^|\.)google\.|goo\.gl$/.test(i.site || ""));
+}
 function genreOf0(i) {
+  if (!isPlace(i)) return "その他";
   const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
   if (t) return t;
   const d = Sorter.detectGenres([i.title, ...(i.tags || []), i.summary, i.description].join(" "))[0];
@@ -500,7 +509,7 @@ const manyPrefs = (list) => new Set(list.map(prefKey).filter((p) => p && p !== "
 function inArea(i) {
   if (activePref !== "all" && prefKey(i) !== activePref) return false;
   if (activeArea === "all") return true;
-  return activeArea === "none" ? !areaOf(i) : areaOf(i) === activeArea;
+  return activeArea === "none" ? isPlace(i) && !areaOf(i) : areaOf(i) === activeArea;   // 「地域なし」は場所だけ(サイトや動画は数えない)
 }
 const inGenre = (i) => !activeGenre || genreOf(i) === activeGenre;
 const areaLabel = () => (activeArea === "none" ? "地域なし" : activeArea !== "all" ? activeArea : prefLabel(activePref));
@@ -537,7 +546,7 @@ function chipRow(box, mark, rows, cur, pick) {
 function renderAreas() {
   const box = $("#areaBar");
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q));
+  const base = items.filter((i) => isPlace(i) && inFolder(i) && matches(i, q));   // 場所だけで数える
   if (new Set(base.map(areaOf)).size < 2) { box.hidden = true; box.innerHTML = ""; return; }
   const tally = (list, keyOf) => {
     const count = new Map();
@@ -717,10 +726,12 @@ function card(i) {
   // 地域(分かっていれば濃く表示。分からなければ薄く「地域を入れる」)。押すと地域を直せる
   const at = el.querySelector(".area-tag");
   const place = i.area || areaOf(i);
-  at.textContent = place ? `📍 ${place}` : "📍 地域を入れる";
-  if (place) at.classList.add("set");
-  at.title = "地域を直す";
-  at.onclick = () => openArea(i);
+  if (isPlace(i)) {
+    at.textContent = place ? `📍 ${place}` : "📍 地域を入れる";
+    if (place) at.classList.add("set");
+    at.title = "地域を直す";
+    at.onclick = () => openArea(i);
+  } else at.remove();   // サイト・動画・買い物には出さない(地域を付けたいときは「名前・メモ」から)
 
   el.querySelector(".who").textContent = i.recommender ? `👤 ${i.recommender}のおすすめ` : "";
 
@@ -729,7 +740,7 @@ function card(i) {
   if (today || i.address || i.tel) {
     si.hidden = false;
     const sum = si.querySelector("summary");
-    sum.textContent = "🕒 " + (today || "お店の情報");
+    sum.textContent = "🕒 " + (today || "くわしい情報");
     if (/定休日/.test(today)) sum.classList.add("closed");
     const rows = [];
     if (i.address) rows.push(`<div><b>住所</b>${escapeHtml(i.address)}</div>`);
@@ -872,7 +883,7 @@ async function saveItem(v, fid) {
 async function afterSave(id, auto, learned = false) {
   await load();
   let it = items.find((x) => x.id === id);
-  if (it && auto && !(it.area || areaOf(it))) {   // 地域が分からない → 先に聞く(入れるとフォルダも振り分け直す)
+  if (it && auto && isPlace(it) && !(it.area || areaOf(it))) {   // 場所なのに地域が分からない → 先に聞く(入れるとフォルダも振り分け直す)
     await openArea(it, true);
     it = items.find((x) => x.id === id);
   }
