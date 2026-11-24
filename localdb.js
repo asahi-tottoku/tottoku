@@ -250,9 +250,10 @@
     const all = mem.items.filter((i) => i.status === "done");
     const targets = all.filter((i) => !i.folder_manual && (ids == null || ids.includes(i.id)));
     const groups = new Map();
-    // 名前を付けずに保存したURL(題名がサイト名のまま)のお店以外は、「同じ名前」とみなさない
-    // (インスタを1つフォルダに入れたら、次の名前なしのインスタも黙って入る、を防ぐ)
-    const bare = (r) => !isPlace(r) && !!r.url && (r.title === r.site || r.title === r.url);
+    // 名前を付けずに保存したURL(題名がサイト名のまま)は、「同じ名前」「同じチェーン」とみなさない
+    // (インスタや食べログを1つフォルダに入れたら、次の名前なしのものも黙って入る、を防ぐ。
+    //  2026-11-24 きよさんの了解で、お店・場所のURLも同じにした。ここだけ、お店の答えが v20 と変わる)
+    const bare = (r) => !!r.url && (r.title === r.site || r.title === r.url);
     const keyOf = (r) => (bare(r) ? "" : norm(r.title)) || "#" + r.id;
     for (const r of targets) {
       const k = keyOf(r);
@@ -284,7 +285,7 @@
           fid = others.length ? others[0].folder_id : null;
           const ck = fid == null && !bare(rows[0]) ? chainKey(rows[0].title) : "";
           if (ck) {
-            const chain = all.filter((r) => !ids2.has(r.id) && fids.has(r.folder_id) && chainKey(r.title) === ck)
+            const chain = all.filter((r) => !ids2.has(r.id) && !bare(r) && fids.has(r.folder_id) && chainKey(r.title) === ck)
               .sort((a, b) => (b.folder_manual || 0) - (a.folder_manual || 0));
             if (chain.length) fid = chain[0].folder_id;
           }
