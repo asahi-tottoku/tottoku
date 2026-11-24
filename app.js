@@ -7,7 +7,6 @@ let activeFolder = "all";   // "all" | "none" | フォルダid
 let activeGenre = null;      // 選んだジャンル(null = 全ジャンル)
 let activeArea = "all";      // 選んだ地域("all" | "none" = 地域なし | 地域の名前)
 let activePref = "all";      // 選んだ都道府県("all" | "none" = 県が分からない | 「静岡県」)。県が2つ以上あるときだけ使う
-let hitIds = null;          // (旧「AIに聞く」の名残。今は常に null)
 let view = "list";          // "list" | "map"
 let myPos = null;           // 現在地 {lat, lng}
 
@@ -621,10 +620,6 @@ function currentList() {
   const base = items.filter((i) => inFolder(i) && matches(i, q) && inGenre(i) && inArea(i));
   let list = base;
   if ($("#sortSel").value === "near") list.sort((a, b) => (distKm(a) ?? 1e9) - (distKm(b) ?? 1e9));
-  if (hitIds) {
-    const rank = new Map(hitIds.map((id, n) => [id, n]));
-    list = items.filter((i) => rank.has(i.id)).sort((a, b) => rank.get(a.id) - rank.get(b.id));
-  }
   return list;
 }
 
@@ -694,7 +689,6 @@ function card(i) {
   const el = $("#cardTpl").content.firstElementChild.cloneNode(true);
   const link = i.url || "#";
   if (i.status === "processing") el.classList.add("processing");
-  if (hitIds) el.classList.add("hit");
   const th = el.querySelector(".thumb");
   th.href = link;
   const noimg = () => { th.classList.add("noimg"); th.textContent = ICONS[i.category] || "🔖"; };
@@ -765,9 +759,6 @@ function card(i) {
     };
   }
   el.querySelector(".act-note").onclick = () => openNote(i);
-  const retry = el.querySelector(".act-retry");
-  retry.hidden = true;   // Web版は、保存したその場で整理するので「再整理」は無い
-  retry.onclick = async () => { await api(`/api/items/${i.id}/retry`, { method: "POST", body: {} }); toast("整理し直しています"); load(); };
   el.querySelector(".act-del").onclick = async () => {
     // 確かめの画面は出さず、消したあと8秒だけ「元に戻す」を出す。続けて消したら、まとめて戻せる
     await api(`/api/items/${i.id}`, { method: "DELETE" });
