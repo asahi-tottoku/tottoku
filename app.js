@@ -481,7 +481,7 @@ function genreOf(i) {
 function isPlace(i) {
   if (i.lat != null || i.area || i.address) return true;
   if (i.category === "飲食店" || i.category === "お出かけ") return true;
-  return i.category === "その他" && (!i.url || /(^|\.)google\.|goo\.gl$/.test(i.site || ""));
+  return i.category === "その他" && (!i.url || /(^|\.)google(\.|$)|goo\.gl$/.test(i.site || ""));
 }
 function genreOf0(i) {
   if (!isPlace(i)) return "その他";
