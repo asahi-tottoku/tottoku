@@ -16,8 +16,19 @@ async function api(path, opts = {}) {
   return LocalAPI.request(opts.method || "GET", path, opts.body || {});
 }
 
+// 消したばかりで、まだ「元に戻す」で戻せるお店(続けて消したら全部ここにたまり、まとめて戻せる)
+let undoItems = [];
+const undoAct = () => ({ label: "元に戻す", ms: 8000, fn: async () => {
+  const back = undoItems; undoItems = [];
+  for (const it of back) await api("/api/items/restore", { method: "POST", body: { item: it } });
+  await load();
+  toast(back.length > 1 ? `${back.length}件を元に戻しました` : "元に戻しました");
+} });
+
 // act = { label, fn, ms }: お知らせの中にボタンを1つ出す(「元に戻す」)
 function toast(msg, act) {
+  // 戻せるお店が残っている間は、ほかのお知らせにも「元に戻す」を付ける(ボタンが消えて戻せなくなるのを防ぐ)
+  if (!act && undoItems.length) act = undoAct();
   const t = $("#toast");
   t.textContent = msg; t.hidden = false;
   if (act) {
@@ -27,7 +38,7 @@ function toast(msg, act) {
     t.appendChild(b);
   }
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (t.hidden = true), act ? act.ms : 2800);
+  toast.timer = setTimeout(() => { t.hidden = true; undoItems = []; }, act ? act.ms : 2800);
 }
 
 function getPref(k, d) { try { return localStorage.getItem("tottoku-" + k) || d; } catch (e) { return d; } }
@@ -38,6 +49,8 @@ async function load() {
   try { data = await api("/api/items"); } catch (e) { toast("データを読み込めませんでした"); }
   items = data.items || [];
   folders = data.folders || [];
+  // 名前・地域・フォルダを直したあとに古い答えが残らないよう、覚えたジャンル・県を捨てる(お店は同じものが返ってくるので)
+  genreMemo = new WeakMap(); prefMemo = new WeakMap();
   if (activeFolder !== "all" && activeFolder !== "none" && !folders.some((f) => f.id === activeFolder)) activeFolder = "all";
   render();
 }
@@ -458,7 +471,7 @@ function compactHours(text) {
 // フォルダは増やさない。選べるものが2つ以上あるときだけ出す。
 const GENRE_NAMES = new Set(Object.keys(Sorter.GENRES));
 const GENRE_LABEL = { "蕎麦": "蕎麦・うどん", "お好み焼き": "お好み焼き・たこ焼き", "バー": "バー・お酒" };   // ボタンに出す名前(うどんの店も「蕎麦」に入るので)
-const genreMemo = new WeakMap();   // 読み込み直すと作り直される(items の中身が新しくなるので)
+let genreMemo = new WeakMap();   // load() のたびに作り直す
 function genreOf(i) {
   if (!genreMemo.has(i)) genreMemo.set(i, genreOf0(i));
   return genreMemo.get(i);
@@ -474,7 +487,7 @@ function genreOf0(i) {
 // お店の「地域」(無ければ住所)を市区町村ごとにまとめる。地域が分からないものは ""(地域なし)。
 const areaOf = (i) => Sorter.areaGroup(i.area) || Sorter.areaGroup(i.address) || "";
 // お店の都道府県。住所に書いてあればそれ、無ければ地域の名前から。地域なし = ""、地域はあるが県が決まらない = "none"
-const prefMemo = new WeakMap();
+let prefMemo = new WeakMap();    // load() のたびに作り直す
 function prefKey(i) {
   if (!prefMemo.has(i)) {
     const a = areaOf(i);
@@ -756,15 +769,12 @@ function card(i) {
   retry.hidden = true;   // Web版は、保存したその場で整理するので「再整理」は無い
   retry.onclick = async () => { await api(`/api/items/${i.id}/retry`, { method: "POST", body: {} }); toast("整理し直しています"); load(); };
   el.querySelector(".act-del").onclick = async () => {
-    // 確かめの画面は出さず、消したあと8秒だけ「元に戻す」を出す
+    // 確かめの画面は出さず、消したあと8秒だけ「元に戻す」を出す。続けて消したら、まとめて戻せる
     await api(`/api/items/${i.id}`, { method: "DELETE" });
+    undoItems.push(i);
     await load();
     const name = (i.title || "").length > 14 ? i.title.slice(0, 13) + "…" : i.title;
-    toast(`「${name}」を削除しました`, { label: "元に戻す", ms: 8000, fn: async () => {
-      await api("/api/items/restore", { method: "POST", body: { item: i } });
-      await load();
-      toast("元に戻しました");
-    } });
+    toast(undoItems.length > 1 ? `${undoItems.length}件を削除しました` : `「${name}」を削除しました`, undoAct());
   };
   return el;
 }

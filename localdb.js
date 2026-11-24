@@ -264,7 +264,11 @@
       }
       if (method === "POST" && path === "/api/items/restore") {   // 消した直後の「元に戻す」
         const it = body.item;
-        if (it && it.id != null && !mem.items.some((i) => i.id === it.id)) mem.items.push(it);
+        if (it && it.id != null && !mem.items.some((i) => i.id === it.id)) {
+          // その間にフォルダが消されていたら「フォルダなし」に戻す(無いフォルダの番号を残さない)
+          if (it.folder_id != null && !mem.folders.some((f) => f.id === it.folder_id)) { it.folder_id = null; it.folder_manual = 0; }
+          mem.items.push(it);
+        }
         return { ok: true };
       }
       if (method === "POST" && path === "/api/items") { const it = addItem(body); return { id: it.id, learned: learnedId === it.id }; }
