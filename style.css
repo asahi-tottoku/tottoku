@@ -340,6 +340,15 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 .filter-note .web-links.big { margin-top: 0; }
 .filter-note .web-links.big a { padding: 10px 4px; font-size: 15px; }
 /* Web版: ホーム画面に追加の案内・書き出し/読み込みボタン */
+/* コピーしたURLを見つけたときの帯・保存欄の「📋 貼り付け」・保存の画面の名前の欄 */
+#clipBar { flex-wrap: nowrap; }
+#clipBar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#clipBar small { color: var(--muted); }
+#clipBar button { margin-left: 0; flex: none; }
+#clipBar .go { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 700; font-size: 13px; padding: 5px 12px; }
+#clipBar .bar-close { background: none; border: none; font-size: 18px; padding: 2px 6px; color: inherit; }
+.add .paste-btn { flex: none; padding-left: 10px; padding-right: 10px; }
+.save-title { margin-bottom: 12px; }
 #installBar { display: flex; align-items: center; gap: 8px; }
 #installBar span { flex: 1; min-width: 0; font-size: 13px; }
 #installBar .bar-close { flex: none; background: none; border: none; font-size: 18px; padding: 2px 6px; color: inherit; }

@@ -35,9 +35,11 @@
 
 <main>
   <div id="installBar" class="bar" hidden></div>
+  <div id="clipBar" class="bar" hidden></div>
 
   <form id="addForm" class="add">
     <input id="addInput" type="text" placeholder="URLや名前を貼り付けて保存" autocomplete="off">
+    <button type="button" id="pasteBtn" class="paste-btn" title="コピーしたものを貼り付けて保存" aria-label="コピーしたものを貼り付けて保存" hidden>📋</button>
     <button type="submit">保存</button>
   </form>
 
@@ -79,7 +81,7 @@
   <div id="empty" class="empty" hidden>
   <p class="empty-title">とっとくの使い方</p>
   <ol class="howto">
-    <li><b>保存する</b>:お店・サイト・動画など、とっておきたいページで「共有」→「コピー」。上の欄に貼り付けて「保存」を押します。お店は、地名とジャンルでフォルダに自動で入ります。</li>
+    <li><b>保存する</b>:お店・サイト・動画など、とっておきたいページで「共有」→「コピー」。上の欄に貼り付けて(📋 を押しても貼り付けられます)「保存」を押します。お店は、地名とジャンルでフォルダに自動で入ります。</li>
     <li><b>ホーム画面に置く</b>:ブラウザのメニュー(iPhone は共有ボタン)から「ホーム画面に追加」。アプリのように開けます。</li>
     <li><b>バックアップ</b>:データはこのスマホの中だけにあります。右上の ⚙ →「全部を書き出す」で、ときどきファイルに残してください。</li>
   </ol>
@@ -108,7 +110,7 @@
   <p id="backupNote" class="set-note"></p>
   <details class="howto-box"><summary>使い方</summary>
   <ol class="howto">
-    <li><b>保存する</b>:お店・サイト・動画など、とっておきたいページで「共有」→「コピー」。上の欄に貼り付けて「保存」を押します。お店は、地名とジャンルでフォルダに自動で入ります。</li>
+    <li><b>保存する</b>:お店・サイト・動画など、とっておきたいページで「共有」→「コピー」。上の欄に貼り付けて(📋 を押しても貼り付けられます)「保存」を押します。お店は、地名とジャンルでフォルダに自動で入ります。</li>
     <li><b>ホーム画面に置く</b>:ブラウザのメニュー(iPhone は共有ボタン)から「ホーム画面に追加」。アプリのように開けます。</li>
     <li><b>バックアップ</b>:データはこのスマホの中だけにあります。右上の ⚙ →「全部を書き出す」で、ときどきファイルに残してください。</li>
   </ol>
@@ -125,8 +127,9 @@
 </dialog>
 
 <dialog id="saveDlg" class="sheet">
-  <p class="sheet-title">どのフォルダに入れますか?</p>
+  <p id="saveHead" class="sheet-title">どのフォルダに入れますか?</p>
   <p id="saveName" class="sheet-sub"></p>
+  <input id="saveTitleInput" type="text" class="field save-title" placeholder="名前を付ける(あとでも直せます)" autocomplete="off" enterkeyhint="done" maxlength="120" hidden>
   <div id="saveList" class="sheet-list"></div>
   <button id="saveNew" class="sheet-new">+ 新しいフォルダを作って入れる</button>
   <button class="sheet-cancel" onclick="this.closest('dialog').close()">やめる</button>

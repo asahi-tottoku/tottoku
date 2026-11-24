@@ -475,14 +475,8 @@ function genreOf(i) {
   if (!genreMemo.has(i)) genreMemo.set(i, genreOf0(i));
   return genreMemo.get(i);
 }
-// 場所(お店・お出かけ先)かどうか。サイト・動画・買い物などは false。
-// false のものには、地域を聞かない・カードに「📍」を出さない・ジャンルの段では「その他」に数える。
-// 分類が「その他」のものは、URLが無い(名前だけ)か Google のリンク(共有リンクは名前しか届かない)なら、お店かもしれないので場所として扱う。
-function isPlace(i) {
-  if (i.lat != null || i.area || i.address) return true;
-  if (i.category === "飲食店" || i.category === "お出かけ") return true;
-  return i.category === "その他" && (!i.url || /(^|\.)google(\.|$)|goo\.gl$/.test(i.site || ""));
-}
+// 場所(お店・お出かけ先)かどうか。サイト・動画・買い物などは false(決め方は localdb.js)
+const isPlace = LocalAPI.isPlace;
 function genreOf0(i) {
   if (!isPlace(i)) return "その他";
   const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
@@ -838,52 +832,107 @@ async function renderMap(list) {
 }
 
 // ---------------------------------------------------------------- 入力
-// 保存: 「保存」を押したら、フォルダを選ぶ画面を出してから保存する(フォルダが無ければそのまま保存)
-$("#addForm").onsubmit = (e) => {
-  e.preventDefault();
+// 保存: 「保存」を押したら、フォルダを選ぶ画面を出してから保存する。
+// URLだけのときは、その画面に名前の欄も出す(通信しないので題名を取れず、そのままだとサイト名になるため)。
+// フォルダが無くて名前も聞かないときは、そのまま保存する。
+const bareUrl = (v) => /^https?:\/\/\S+$/.test(v);
+const needsName = (v) => bareUrl(v) && !/google\.[^/]+\/maps\/place\//.test(v);   // マップの場所のURLは名前が入っている
+function startSave() {
   const v = $("#addInput").value.trim();
   if (!v) return;
   $("#addInput").blur();
-  if (!folders.length) { saveItem(v, null); return; }
+  $("#clipBar").hidden = true;
+  const ask = needsName(v);
+  if (!folders.length && !ask) { saveItem(v, null); return; }
   const dlg = $("#saveDlg");
+  $("#saveHead").textContent = folders.length ? "どのフォルダに入れますか?" : "保存します";
   $("#saveName").textContent = v.length > 60 ? v.slice(0, 60) + "…" : v;
+  const nameIn = $("#saveTitleInput");
+  nameIn.hidden = !ask;
+  nameIn.value = "";
+  const name = () => (ask ? nameIn.value.trim() : "");
   const list = $("#saveList");
   list.innerHTML = "";
   const opt = (label, fid, cls = "") => {
     const b = document.createElement("button");
     b.innerHTML = label;
     if (cls) b.className = cls;
-    b.onclick = () => { dlg.close(); saveItem(v, fid); };
+    b.onclick = () => { dlg.close(); saveItem(v, fid, name()); };
     list.appendChild(b);
   };
-  opt('🗂 自動で選ぶ<span class="hint">地名とジャンルで振り分け</span>', null, "accent");
-  folders.forEach((f) => opt("📁 " + escapeHtml(f.name), f.id));
+  if (folders.length) {
+    opt('🗂 自動で選ぶ<span class="hint">名前・地名・種類で振り分け</span>', null, "accent");
+    folders.forEach((f) => opt("📁 " + escapeHtml(f.name), f.id));
+  } else opt("保存する", null, "accent");
   $("#saveNew").onclick = async () => {
+    const nm = name();
     dlg.close();
     const id = await createFolder();
-    if (id) { await load(); saveItem(v, id); }
+    if (id) { await load(); saveItem(v, id, nm); }
   };
   dlg.showModal();
-};
+  if (document.activeElement === nameIn) nameIn.blur();   // 開いただけでキーボードを出さない(フォルダの一覧が隠れる)
+}
+$("#addForm").onsubmit = (e) => { e.preventDefault(); startSave(); };
+$("#saveTitleInput").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } };   // 「完了」でキーボードを閉じる
 
-async function saveItem(v, fid) {
-  const body = /^https?:\/\//.test(v) ? { url: v } : { text: v };
+async function saveItem(v, fid, name = "") {
+  const body = /^https?:\/\//.test(v) ? (bareUrl(v) ? { url: v, name } : { url: "", text: v }) : { text: v };
   body.folder_id = fid;
   $("#addInput").value = "";
   try {
     const res = await api("/api/items", { method: "POST", body });
-    await afterSave(res.id, fid == null, res.learned);
+    await afterSave(res.id, fid == null, res.learned, res.named);
   } catch (err) {
     toast("保存できませんでした");
   }
 }
 
+// ---------------------------------------------------------------- コピーしたものを貼り付けて保存(通信しない。この端末のクリップボードを読むだけ)
+// 📋 ボタン: 押したときだけ読む(iPhone は毎回「ペースト」の確認が出る。Android は初回だけ許可を聞かれる)。
+// 帯(#clipBar): 許可がもう出ているときだけ、開いたときにコピーしてあるURLを見つけて「保存」を出す。勝手に許可は聞かない。
+const canPaste = !!(navigator.clipboard && navigator.clipboard.readText);
+async function readClip() {
+  try { return (await navigator.clipboard.readText()).trim().slice(0, 2000); } catch (e) { return null; }
+}
+const oneLine = (t) => t.replace(/\s*\n\s*/g, " ");   // 入力欄は1行。改行をそのまま入れると前後がつながって壊れる
+async function pasteAndSave() {
+  const t = await readClip();
+  if (t == null) { toast("貼り付けできませんでした。欄を長押しして「貼り付け」を選んでください"); return; }
+  if (!t) { toast("コピーしたものがありません"); return; }
+  $("#addInput").value = oneLine(t);
+  // URLが入っていれば保存の画面へ。文だけのときは欄に入れるだけ(見てから「保存」を押してもらう)
+  if (/https?:\/\//.test(t)) startSave();
+  else toast("貼り付けました。「保存」を押してください");
+}
+$("#pasteBtn").hidden = !canPaste;
+$("#pasteBtn").onclick = pasteAndSave;
+async function checkClip() {
+  const bar = $("#clipBar");
+  if (!canPaste || !navigator.permissions || !document.hasFocus() || document.querySelector("dialog[open]")) return;
+  try {
+    if ((await navigator.permissions.query({ name: "clipboard-read" })).state !== "granted") return;
+  } catch (e) { return; }   // iPhone など、調べられない所では何もしない(📋 ボタンを使う)
+  const t = await readClip();
+  const url = ((t || "").match(/https?:\/\/\S+/) || [""])[0];
+  if (!url || url === getPref("clipSeen", "") || items.some((i) => i.url === url)) { bar.hidden = true; return; }
+  const seen = () => { setPref("clipSeen", url); bar.hidden = true; };
+  bar.innerHTML = `<span>📋 コピーしたURLがあります<br><small>${escapeHtml(url.replace(/^https?:\/\/(www\.)?/, ""))}</small></span>
+    <button type="button" class="go">保存</button><button type="button" class="bar-close" aria-label="閉じる">✕</button>`;
+  bar.querySelector(".go").onclick = () => { seen(); $("#addInput").value = oneLine(t); startSave(); };
+  bar.querySelector(".bar-close").onclick = seen;
+  bar.hidden = false;
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkClip(); });
+window.addEventListener("focus", checkClip);
+
 // 保存のあと: 入ったフォルダを知らせる。自動で決まらなかったら、どこに入れるかその場で聞く
 // (選んだものは「自分で選んだ」になり、同じ名前・同じチェーンの店を次から同じフォルダに入れる)
-async function afterSave(id, auto, learned = false) {
+async function afterSave(id, auto, learned = false, named = false) {
   await load();
   let it = items.find((x) => x.id === id);
-  if (it && auto && isPlace(it) && !(it.area || areaOf(it))) {   // 場所なのに地域が分からない → 先に聞く(入れるとフォルダも振り分け直す)
+  const memo = named && it && folderName(it.folder_id);   // 名前だけのメモが、フォルダ名の言葉でフォルダに入った → 地域は聞かない
+  if (it && auto && isPlace(it) && !memo && !(it.area || areaOf(it))) {   // 場所なのに地域が分からない → 先に聞く(入れるとフォルダも振り分け直す)
     await openArea(it, true);
     it = items.find((x) => x.id === id);
   }
@@ -1072,8 +1121,9 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").ca
     history.replaceState(null, "", location.pathname);
     const res = await api("/api/items", { method: "POST",
       body: { url: p.get("url") || "", text: p.get("text") || "", title: p.get("title") || "" } });
-    await afterSave(res.id, true, res.learned);
+    await afterSave(res.id, true, res.learned, res.named);
   } else {
     await load();
+    checkClip();
   }
 })();
