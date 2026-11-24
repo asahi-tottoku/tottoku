@@ -180,18 +180,20 @@
   };
   // フォルダ名の言葉。地名・料理のジャンル(辞書が分かる言葉)は外す(それは辞書の仕事。「御殿場 寿司」に御殿場のパン屋を入れない)
   const PREF_RE = /^(北海道|青森|岩手|宮城|秋田|山形|福島|茨城|栃木|群馬|埼玉|千葉|東京|神奈川|新潟|富山|石川|福井|山梨|長野|岐阜|静岡|愛知|三重|滋賀|京都|大阪|兵庫|奈良|和歌山|鳥取|島根|岡山|広島|山口|徳島|香川|愛媛|高知|福岡|佐賀|長崎|熊本|大分|宮崎|鹿児島|沖縄)[都府県]?$/;
-  const plainWords = (name) => String(name || "").split(/[\s・、,\/]+/)
-    .filter((t) => t && !PREF_RE.test(t) && !S.detectPlace(t) && !S.detectGenres(t).length);
+  // フォルダ名ごとの答えは覚えておく(1件ごと・フォルダごとに全国の地名の辞書を引き直すと、振り分け直しが何秒もかかる)
+  const memoName = (fn) => { const m = new Map(); return (name) => { const k = String(name || ""); if (!m.has(k)) m.set(k, fn(k)); return m.get(k); }; };
+  const plainWords = memoName((name) => name.split(/[\s・、,\/]+/)
+    .filter((t) => t && !PREF_RE.test(t) && !S.detectPlace(t) && !S.detectGenres(t).length));
   // 地名・都道府県・料理のジャンルの言葉が入ったフォルダ(「沼津 ランチ」「東京 動画」)。お店のフォルダなので、
   // 下の3つ(フォルダ名の言葉・種類・同じサイト)では相手にしない(地名を見ずに、サイトや動画を黙って入れないため)
-  const placeFolder = (name) => String(name || "").split(/[\s・、,\/]+/)
-    .some((t) => t && (PREF_RE.test(t) || S.detectPlace(t) || S.detectGenres(t).length));
+  const placeFolder = memoName((name) => name.split(/[\s・、,\/]+/)
+    .some((t) => t && (PREF_RE.test(t) || S.detectPlace(t) || S.detectGenres(t).length)));
   const isAscii = (t) => /^[\x00-\x7f]+$/.test(t);
   const isKana = (t) => /^[ァ-ヶー]+$/.test(t);
   // 言葉をさがす用(norm と違い「ー」を残す。「ビール」を「森ビル」に合わせない)
   const normW = (s) => String(s || "").normalize("NFKC").replace(/[\s・\-()\[\]【】「」]/g, "").toLowerCase();
-  const folderTokens = (name) => plainWords(name).map((t) => (isAscii(t) ? t.toLowerCase() : normW(t)))
-    .filter((t) => t.length >= (isAscii(t) ? 3 : 2));
+  const folderTokens = memoName((name) => plainWords(name).map((t) => (isAscii(t) ? t.toLowerCase() : normW(t)))
+    .filter((t) => t.length >= (isAscii(t) ? 3 : 2)));
   const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // 英字の言葉は、単語として入っているときだけ(「note」を「Keynote」に合わせない)。
   // カタカナの言葉は、すぐ後ろにカタカナが続かないときだけ(「メモ」を「メモリ」に合わせない)

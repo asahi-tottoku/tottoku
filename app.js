@@ -635,8 +635,9 @@ function renderBackup() {
   const box = $("#remind");
   const DAY = 86400000, now = Date.now();
   const last = Number(getPref("exportedAt", 0)) || 0;
-  const first = items.reduce((m, i) => Math.min(m, (i.created_at || 0) * 1000 || now), now);
-  const due = items.length >= 5 && now - (last || first) > 30 * DAY && now > (Number(getPref("backupSnooze", 0)) || 0);
+  const every = [...items, ...memos];   // メモも数える(メモばかりの人にも出す)
+  const first = every.reduce((m, i) => Math.min(m, (i.created_at || 0) * 1000 || now), now);
+  const due = every.length >= 5 && now - (last || first) > 30 * DAY && now > (Number(getPref("backupSnooze", 0)) || 0);
   box.hidden = !due;
   if (!due) return;
   box.innerHTML = `<p class="remind-title">💾 バックアップを取りませんか</p>
@@ -869,10 +870,20 @@ function startSave() {
     b.onclick = () => { dlg.close(); saveItem(v, fid, name()); };
     list.appendChild(b);
   };
-  if (folders.length) {
-    opt('🗂 自動で選ぶ<span class="hint">名前・地名・種類で振り分け</span>', null, "accent");
-    folders.forEach((f) => opt("📁 " + escapeHtml(f.name), f.id));
-  } else opt("保存する", null, "accent");
+  // メモとして保存するときは、フォルダを聞かない(メモはメモの画面にだけ出る)
+  const fill = () => {
+    const memo = !hasUrl && memoChk.checked;
+    list.innerHTML = "";
+    $("#saveHead").textContent = memo ? "メモに保存します" : folders.length ? "どのフォルダに入れますか?" : "保存します";
+    $("#saveNew").hidden = memo;
+    if (memo) opt("📝 メモに保存する", null, "accent");
+    else if (folders.length) {
+      opt('🗂 自動で選ぶ<span class="hint">名前・地名・種類で振り分け</span>', null, "accent");
+      folders.forEach((f) => opt("📁 " + escapeHtml(f.name), f.id));
+    } else opt("保存する", null, "accent");
+  };
+  memoChk.onchange = fill;
+  fill();
   $("#saveNew").onclick = async () => {
     const nm = name();
     dlg.close();
@@ -884,7 +895,7 @@ function startSave() {
 }
 // メモらしい文: 「。」「?」があり、ひらがなが入った8文字以上の文で、料理のジャンルも地名も無い。
 // 長いだけの名前・「!」の付く店名(「やよい軒!」)・短い名前(「モーニング娘。」)には印を付けない
-const memoLike = (v) => /[。?？]/.test(v) && /[ぁ-ん]/.test(v) && v.length >= 8 && !Sorter.detectGenres(v).length && !Sorter.detectPlace(v);
+const memoLike = (v) => /[。｡?？]/.test(v) && /[ぁ-ん]/.test(v) && v.length >= 8 && !Sorter.detectGenres(v).length && !Sorter.detectPlace(v);
 $("#addForm").onsubmit = (e) => { e.preventDefault(); startSave(); };
 $("#saveTitleInput").onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); e.target.blur(); } };   // 「完了」でキーボードを閉じる
 
@@ -1112,7 +1123,7 @@ function renderSettings() {
     b.onclick = () => saveLook({ theme: b.dataset.theme });
   });
   const last = getPref("exported", "");
-  $("#backupNote").textContent = `保存したもの ${items.length}件・フォルダ ${folders.length}個。` +
+  $("#backupNote").textContent = `保存したもの ${items.length + memos.length}件${memos.length ? `(うちメモ ${memos.length}件)` : ""}・フォルダ ${folders.length}個。` +
     "データはこの端末の中だけにあります。機種変更やブラウザのデータ削除で消えるので、ときどき書き出してください。" +
     (last ? `(前回の書き出し: ${last})` : "");
 }
@@ -1154,7 +1165,7 @@ $("#importFile").onchange = async (e) => {
   let data;
   try { data = JSON.parse(await f.text()); } catch (err) { toast("ファイルを読めませんでした"); return; }
   const n = Array.isArray(data.items) ? data.items.length : 0;
-  if (!confirm(`このファイルの${n}件で、今のデータ(${items.length}件)を置き換えますか?\n今のデータは消えます。`)) return;
+  if (!confirm(`このファイルの${n}件で、今のデータ(${items.length + memos.length}件)を置き換えますか?\n今のデータは消えます。`)) return;
   try {
     const r = LocalAPI.importData(data);
     await LocalAPI.saveState();
