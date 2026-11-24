@@ -247,7 +247,8 @@
     const fl = sortedFolders();
     if (!fl.length) return 0;
     const fids = new Set(fl.map((f) => f.id));
-    const all = mem.items.filter((i) => i.status === "done");
+    // メモは振り分けない(メモの画面にだけ出るので、フォルダは意味が無い)。同じ名前のお店がメモにならうこともない
+    const all = mem.items.filter((i) => i.status === "done" && i.category !== "メモ");
     const targets = all.filter((i) => !i.folder_manual && (ids == null || ids.includes(i.id)));
     const groups = new Map();
     // 名前を付けずに保存したURL(題名がサイト名のまま)は、「同じ名前」「同じチェーン」とみなさない
