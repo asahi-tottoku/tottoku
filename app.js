@@ -879,10 +879,9 @@ function startSave() {
   dlg.showModal();
   if (dlg.contains(document.activeElement)) document.activeElement.blur();   // 開いただけでキーボードを出さない(フォルダの一覧が隠れる)
 }
-// メモらしい文: 長い・文になっている(句点や「?」)もので、料理のジャンルも地名も入っていない
 // メモらしい文: 「。」「?」があり、ひらがなが入った8文字以上の文で、料理のジャンルも地名も無い。
 // 長いだけの名前・「!」の付く店名(「やよい軒!」)・短い名前(「モーニング娘。」)には印を付けない
-const memoLike = (v) => /[。??]/.test(v) && /[ぁ-ん]/.test(v) && v.length >= 8 && !Sorter.detectGenres(v).length && !Sorter.detectPlace(v);
+const memoLike = (v) => /[。?？]/.test(v) && /[ぁ-ん]/.test(v) && v.length >= 8 && !Sorter.detectGenres(v).length && !Sorter.detectPlace(v);
 $("#addForm").onsubmit = (e) => { e.preventDefault(); startSave(); };
 $("#saveTitleInput").onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); e.target.blur(); } };   // 「完了」でキーボードを閉じる
 

@@ -86,7 +86,7 @@
     // 買い物は、売り場のページだけ(Yahoo!ニュース・楽天トラベル・Amazon の動画などは買い物にしない)
     if (/mercari|paypayfleamarket/.test(h) || /^(www|item|books|product|search)\.rakuten\.co\.jp$/.test(h)
       || /(^|\.)(shopping|auctions)\.yahoo\.co\.jp$/.test(h)
-      || (/(^|\.)amazon\.|(^|\.)amzn\./.test(h) && !/\/(gp\/video|prime-?video)/i.test(url))) return "買い物";
+      || (/(^|\.)amazon\.|(^|\.)amzn\./.test(h) && !/^watch\./.test(h) && !/\/(gp\/video|prime-?video)/i.test(url))) return "買い物";
     if (/youtube|youtu\.be|tiktok/.test(h)) return "動画";
     if (/cookpad|kurashiru|delishkitchen|^recipe\.rakuten\./.test(h)) return "レシピ";
     if (genres.length || /tabelog|hotpepper|retty|gnavi|ikyu|hitosara/.test(h)) return "飲食店";
@@ -167,7 +167,9 @@
   // サイトの呼び名(フォルダ名「YouTube」「楽天」などと合わせる用)
   const SITE_NAMES = [[/youtube|youtu\.be/, "youtube ユーチューブ"], [/amazon|amzn\./, "amazon アマゾン"], [/rakuten/, "rakuten 楽天"],
     [/cookpad/, "cookpad クックパッド"], [/instagram/, "instagram インスタ"], [/(^|\.)x\.com$|twitter/, "twitter ツイッター"],
-    [/tiktok/, "tiktok ティックトック"], [/mercari/, "mercari メルカリ"], [/yahoo/, "yahoo ヤフー"], [/(^|\.)note\.com$/, "note ノート"]];
+    [/tiktok/, "tiktok ティックトック"], [/mercari/, "mercari メルカリ"], [/yahoo/, "yahoo ヤフー"], [/(^|\.)note\.com$/, "note ノート"],
+    [/facebook|fb\.com|fb\.me/, "facebook フェイスブック"], [/threads\./, "threads スレッズ"], [/pinterest|pin\.it/, "pinterest ピンタレスト"],
+    [/ameblo|ameba/, "ameblo アメブロ"], [/nicovideo|nico\.ms/, "niconico ニコニコ"], [/(^|\.)line\.me$|lin\.ee/, "line ライン"]];
   // 種類(分類)と、それを入れそうなフォルダ名の言葉
   const KIND_WORDS = {
     "動画": /動画|ビデオ|映像|youtube|ユーチューブ|見る|観る/,
@@ -211,12 +213,13 @@
     return score[0][0];
   }
   // 種類に合う名前のフォルダ(動画 →「あとで見る動画」、ふつうのサイト →「あとで読む」)。1つだけ合うときに決める
+  const kindHit = (r, f) => { const re = KIND_WORDS[r.category]; return !!re && re.test(String(f.name).normalize("NFKC").toLowerCase()); };
   function kindFolder(r, fl) {
     // 分類が「その他」のサイトは、お店の公式サイトかもしれないので決めない(2026-11-24 きよさん「聞く」)
     const re = KIND_WORDS[r.category];
     if (!re) return null;
     // 地名・料理のジャンルの入ったフォルダは見ない(「沼津 中華料理」にレシピを、「東京 動画」に動画を入れない)
-    const hit = fl.filter((f) => !placeFolder(f.name) && re.test(String(f.name).normalize("NFKC").toLowerCase()));
+    const hit = fl.filter((f) => !placeFolder(f.name) && kindHit(r, f));
     return hit.length === 1 ? hit[0].id : null;
   }
   // 自分で同じサイトのものを入れたフォルダ(多いほう。同数なら決めない)。自動で入ったものは数えない。
@@ -245,15 +248,19 @@
     const all = mem.items.filter((i) => i.status === "done");
     const targets = all.filter((i) => !i.folder_manual && (ids == null || ids.includes(i.id)));
     const groups = new Map();
+    // 名前を付けずに保存したURL(題名がサイト名のまま)のお店以外は、「同じ名前」とみなさない
+    // (インスタを1つフォルダに入れたら、次の名前なしのインスタも黙って入る、を防ぐ)
+    const bare = (r) => !isPlace(r) && !!r.url && (r.title === r.site || r.title === r.url);
+    const keyOf = (r) => (bare(r) ? "" : norm(r.title)) || "#" + r.id;
     for (const r of targets) {
-      const k = norm(r.title) || "#" + r.id;
+      const k = keyOf(r);
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(r);
     }
     let moved = 0;
     const sigs = new Map();
     for (const [key, rows] of groups) {
-      const same = all.filter((r) => norm(r.title) === key && fids.has(r.folder_id));
+      const same = all.filter((r) => keyOf(r) === key && fids.has(r.folder_id));
       const manual = same.filter((r) => r.folder_manual);
       let fid = null;
       if (manual.length) fid = manual[0].folder_id;
@@ -265,15 +272,15 @@
         if (fid == null) {
           fid = S.pickFolder(rows, fl, cur);
           // お店以外: 辞書は文字の一部でも合わせる(「note」に「Keynote」、「メモ」に「メモリ」)。
-          // 地名・ジャンルの無いフォルダへは、言葉として合っているときだけ入れる(合わなければ決めずに聞く)
+          // 地名・ジャンルの無いフォルダへは、言葉として合っているか、種類に合う名前(動画 →「見る」)のときだけ入れる(合わなければ決めずに聞く)
           const f = site && fid != null && fid !== cur && fl.find((x) => x.id === fid);
-          if (f && !placeFolder(f.name) && !tokenHits(rows[0])(f)) fid = null;
+          if (f && !placeFolder(f.name) && !tokenHits(rows[0])(f) && !kindHit(rows[0], f)) fid = null;
         }
         if (fid == null && newItem) {
           const ids2 = new Set(rows.map((r) => r.id));
           const others = same.filter((r) => !ids2.has(r.id));
           fid = others.length ? others[0].folder_id : null;
-          const ck = fid == null ? chainKey(rows[0].title) : "";
+          const ck = fid == null && !bare(rows[0]) ? chainKey(rows[0].title) : "";
           if (ck) {
             const chain = all.filter((r) => !ids2.has(r.id) && fids.has(r.folder_id) && chainKey(r.title) === ck)
               .sort((a, b) => (b.folder_manual || 0) - (a.folder_manual || 0));
@@ -320,7 +327,7 @@
     };
     organize(it);
     if (name) it.title = name;   // 「歌手 - 曲」の「 - 曲」を飾りとして切らない
-    if (kind === "memo") it.category = "メモ";   // 保存の画面で「メモとして保存」を選んだ(お店・場所ではない)
+    if (kind === "memo") { it.category = "メモ"; it.area = ""; }   // 保存の画面で「メモとして保存」を選んだ(お店・場所ではない)
     it.note = String(note || "").trim().slice(0, 1000);   // 保存の画面で書いたメモ
     mem.items.push(it);
     learnedId = null;
