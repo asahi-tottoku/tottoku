@@ -357,3 +357,27 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 #installBar span { flex: 1; min-width: 0; font-size: 13px; }
 #installBar .bar-close { flex: none; background: none; border: none; font-size: 18px; padding: 2px 6px; color: inherit; }
 button.set-btn { width: 100%; margin-bottom: 8px; font: inherit; background: none; color: inherit; }
+
+/* ---------- メモだけの場所(右上のえんぴつで開く。書いて保存しておくだけ) ---------- */
+.toast { z-index: 30; }   /* メモの画面の上にも「元に戻す」を出す */
+.memo-view { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--bg); }
+.memo-view[hidden] { display: none; }
+.memo-top {
+  position: relative; display: flex; align-items: center; min-height: 54px;
+  padding: env(safe-area-inset-top, 0) 6px 0; border-bottom: 1px solid var(--line);
+}
+.memo-top h2 { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); margin: 0; font-size: 17px; line-height: 1.5; }
+.memo-back { border: none; background: none; color: var(--muted); font-size: 15px; padding: 12px 10px; }
+.memo-body { flex: 1; overflow-y: auto; width: 100%; max-width: 760px; margin: 0 auto; padding: 16px 16px 96px; }
+.memo-form { flex-direction: column; align-items: flex-end; gap: 8px; margin-bottom: 20px; }
+.memo-form textarea { font-size: 16px; line-height: 1.6; background: var(--surface); }
+.memo-form button { min-width: 96px; padding: 10px 20px; }
+/* メモは枠で囲まず、線で区切るだけ(お店のカードと形を変える) */
+.memo-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.memo-list li { padding: 14px 2px 8px; border-bottom: 1px solid var(--line); }
+.memo-text { margin: 0; font-size: 16px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.memo-sub { margin: 4px 0 0; font-size: 13px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.memo-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.memo-del { border: none; background: none; color: var(--muted); font-size: 13px; padding: 8px 10px; margin-right: -10px; }
+.memo-empty { margin: 28px 2px; font-size: 14px; color: var(--muted); }
+.memo-view button:focus-visible, #memoBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

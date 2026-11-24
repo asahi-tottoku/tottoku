@@ -2,6 +2,7 @@ const $ = (s) => document.querySelector(s);
 const ICONS = { "飲食店": "🍽", "お出かけ": "📍", "買い物": "🛍", "記事": "📰", "動画": "▶", "レシピ": "🍳", "メモ": "📝", "その他": "🔖" };
 const WD = "日月火水木金土";
 let items = [];
+let memos = [];   // 種類が「メモ」のもの。一覧には出さず、メモの画面(右上のえんぴつ)だけに出す
 let folders = [];
 let activeFolder = "all";   // "all" | "none" | フォルダid
 let activeGenre = null;      // 選んだジャンル(null = 全ジャンル)
@@ -44,14 +45,16 @@ function getPref(k, d) { try { return localStorage.getItem("tottoku-" + k) || d;
 function setPref(k, v) { try { localStorage.setItem("tottoku-" + k, v); } catch (e) { /* 保存できなくてもよい */ } }
 
 async function load() {
-  let data = { items, folders };
+  let data = { items: [...items, ...memos], folders };
   try { data = await api("/api/items"); } catch (e) { toast("データを読み込めませんでした"); }
-  items = data.items || [];
+  items = (data.items || []).filter((i) => i.category !== "メモ");
+  memos = (data.items || []).filter((i) => i.category === "メモ").sort((a, b) => b.created_at - a.created_at || b.id - a.id);
   folders = data.folders || [];
   // 名前・地域・フォルダを直したあとに古い答えが残らないよう、覚えたジャンル・県を捨てる(お店は同じものが返ってくるので)
   genreMemo = new WeakMap(); prefMemo = new WeakMap();
   if (activeFolder !== "all" && activeFolder !== "none" && !folders.some((f) => f.id === activeFolder)) activeFolder = "all";
   render();
+  renderMemos();
 }
 
 const folderName = (id) => (folders.find((f) => f.id === id) || {}).name;
@@ -943,6 +946,8 @@ window.addEventListener("focus", checkClip);
 // (選んだものは「自分で選んだ」になり、同じ名前・同じチェーンの店を次から同じフォルダに入れる)
 async function afterSave(id, auto, learned = false, named = false) {
   await load();
+  // 「メモとして保存」したものは一覧に出ない。メモの画面にあることを知らせる
+  if (memos.some((x) => x.id === id)) { toast("メモに保存しました(右上のえんぴつから見られます)"); return; }
   let it = items.find((x) => x.id === id);
   const memo = named && it && folderName(it.folder_id);   // 名前だけのメモが、フォルダ名の言葉でフォルダに入った → 地域は聞かない
   if (it && auto && isPlace(it) && !memo && !(it.area || areaOf(it))) {   // 場所なのに地域が分からない → 先に聞く(入れるとフォルダも振り分け直す)
@@ -954,6 +959,54 @@ async function afterSave(id, auto, learned = false, named = false) {
   // learned: 2つのフォルダで迷ったが、前に自分で選んだのと同じ側に入れた
   toast(where ? `「${where}」に保存しました` + (learned ? "(前と同じ分け方)" : "") : "とっとくに保存しました");
 }
+
+// ---------------------------------------------------------------- メモだけの場所(書いて保存しておくだけ。操作は「保存」と「削除」)
+// 中身は、種類が「メモ」のもの(保存の画面で「メモとして保存」を選んだものも、ここに入る)。バックアップにも入る。
+function renderMemos() {
+  const list = $("#memoList");
+  list.innerHTML = "";
+  $("#memoEmpty").hidden = memos.length > 0;
+  for (const m of memos) {
+    const li = document.createElement("li");
+    li.innerHTML = `<p class="memo-text"></p><p class="memo-sub" hidden></p>
+      <div class="memo-foot"><span></span><button type="button" class="memo-del">削除</button></div>`;
+    li.querySelector(".memo-text").textContent = m.shared_text || m.url || m.title;
+    if (m.note) { const sub = li.querySelector(".memo-sub"); sub.textContent = m.note; sub.hidden = false; }
+    li.querySelector(".memo-foot span").textContent = fmtDate(m.created_at);
+    li.querySelector(".memo-del").onclick = async () => {
+      // お店と同じく、確かめの画面は出さず、8秒だけ「元に戻す」を出す
+      await api(`/api/items/${m.id}`, { method: "DELETE" });
+      undoItems.push(m);
+      await load();
+      toast(undoItems.length > 1 ? `${undoItems.length}件を削除しました` : "メモを削除しました", undoAct());
+    };
+    list.appendChild(li);
+  }
+}
+const memoOpen = () => !$("#memoView").hidden;
+function showMemo(on) {
+  $("#memoView").hidden = !on;
+  document.body.style.overflow = on ? "hidden" : "";
+  if (on && !memos.length) $("#memoInput").focus();   // まだ1つも無いときだけ、すぐ書けるように
+}
+// スマホの「戻る」でもメモの画面が閉じるように、開くとき履歴を1つ足す
+$("#memoBtn").onclick = () => { if (memoOpen()) return; history.pushState({ memo: 1 }, ""); showMemo(true); };
+$("#memoBack").onclick = () => history.back();
+window.addEventListener("popstate", () => { if (memoOpen()) showMemo(false); });
+$("#memoForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const input = $("#memoInput");
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+  try {
+    await api("/api/items", { method: "POST", body: { text, kind: "memo" } });
+    input.value = "";
+    await load();
+    toast("メモを保存しました");
+  } catch (err) {
+    toast("保存できませんでした");
+  }
+};
 
 // ---------------------------------------------------------------- Webで探す(AIなし: 同じ言葉でほかのサイトを開くだけ)
 const googleUrl = (q) => "https://www.google.com/search?q=" + encodeURIComponent(q);
