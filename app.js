@@ -246,7 +246,7 @@ function dropSort(moved) {
   clearInterval(d.timer);
   d.el.classList.remove("lifted");
   document.body.classList.remove("noselect");
-  const ids = [...d.el.parentElement.querySelectorAll(d.o.sel)].map((n) => Number(n.dataset.key));
+  const ids = [...d.el.parentElement.querySelectorAll(d.o.sel)].map((n) => /^\d+$/.test(n.dataset.key) ? Number(n.dataset.key) : n.dataset.key);
   if (moved && d.o.onDone) d.o.onDone(ids);
 }
 
@@ -1017,19 +1017,32 @@ function renderHeader() {
   $("#boxBack").setAttribute("aria-label", `箱の並びに戻る(今は「${$("#boxTitle").textContent}」)`);
 }
 
+// 「すべて」「メモ」の箱の位置(0から)。前の版の並び(すべて・メモが先頭)が既定
+function fixedPos() {
+  try {
+    const p = JSON.parse(getPref("fixedPos", "{}"));
+    if (p.all >= 0 && p.memo >= 0 && p.all !== p.memo) return p;
+  } catch (e) { /* 読めなければ既定 */ }
+  return { all: 0, memo: 1 };
+}
+
 function renderBoxes() {
   const grid = $("#boxGrid");
   grid.innerHTML = "";
   grid.classList.toggle("moving", moveMode);
   $("#moveBar").hidden = !moveMode;
   $("#boxStat").textContent = `${boxes.length} はこ / ${items.length} 件`;
-  // 2枚目は決まった「メモ」の箱(押すとメモの画面)。動かせない・消せない
-  const cards = [{ key: "all", name: "すべて", list: items }, { key: "memo", name: "メモ", list: memos }, ...boxes.map((b) => ({ key: b.id, name: b.name, list: items.filter((i) => boxOf(i) === b.id) }))];
+  // 「すべて」と「メモ」(押すとメモの画面)は決まった箱。消せないが、並べ替えはできる。
+  // 箱の順はデータに、この2つの位置はこの端末(tottoku-fixedPos)に覚える
+  const cards = boxes.map((b) => ({ key: b.id, name: b.name, list: items.filter((i) => boxOf(i) === b.id) }));
+  const fixedCards = [{ key: "all", name: "すべて", list: items }, { key: "memo", name: "メモ", list: memos }];
+  const pos = fixedPos();
+  fixedCards.sort((a, b) => pos[a.key] - pos[b.key])
+    .forEach((c) => cards.splice(Math.min(pos[c.key], cards.length), 0, c));
   cards.forEach((c, n) => {
     const a = document.createElement("button");
     a.type = "button";
-    const fixed = c.key === "all" || c.key === "memo";
-    a.className = `box-card tint-${c.key === "memo" ? 1 : tintOf(c.key)}` + (fixed ? "" : " sortable");
+    a.className = `box-card tint-${c.key === "memo" ? 1 : tintOf(c.key)} sortable`;
     a.dataset.key = c.key;
     a.innerHTML = `<span class="box-no"></span><span class="box-name"></span><span class="box-sub"></span><span class="box-n"></span>`;
     a.querySelector(".box-no").textContent = `${pad2(n + 1)} / ${pad2(cards.length)}`;
@@ -1041,11 +1054,12 @@ function renderBoxes() {
     a.querySelector(".box-n").textContent = c.list.length;
     a.setAttribute("aria-label", `${c.name}(${c.list.length}件)`);
     a.onclick = () => { if (moveMode) return; if (c.key === "memo") $("#memoBtn").click(); else enterBox(c.key); };
-    if (!fixed) {
-      attachSort(a, { sel: ".box-card.sortable", axis: "xy", instant: () => moveMode,
-        onLift: () => { if (!moveMode) { moveMode = true; grid.classList.add("moving"); $("#moveBar").hidden = false; } },
-        onDone: saveBoxOrder });
-    }
+    attachSort(a, { sel: ".box-card.sortable", axis: "xy", instant: () => moveMode,
+      onLift: () => { if (!moveMode) { moveMode = true; grid.classList.add("moving"); $("#moveBar").hidden = false; } },
+      onDone: (keys) => {
+        setPref("fixedPos", JSON.stringify({ all: keys.indexOf("all"), memo: keys.indexOf("memo") }));
+        saveBoxOrder(keys.filter((k) => typeof k === "number"));
+      } });
     grid.appendChild(a);
   });
   const add = document.createElement("button");
