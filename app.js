@@ -164,7 +164,7 @@ async function saveFolderOrder(subIds) {
 // ---------------------------------------------------------------- 長押しで並べ替え(箱のカード・フォルダの段で共通)
 // 長押し(0.5秒)で持ち上がり、指を離さずに動かすと、重なった所と入れ替わる。離すと置かれ、すぐ保存する。
 // o = { sel: 並べ替える仲間, axis: "x" | "xy", scroller: 横に動く段, instant(): 押してすぐ持ち上げる(並べ替え中),
-//       onLift(), onDone(ids), onContext() }
+//       onLift(), onDone(ids), onDrop(): 離したとき(動かさなくても), onContext() }
 let sortDrag = null;
 function attachSort(el, o) {
   let timer = null, st = null, fired = false, moved = false, suppress = false;
@@ -248,6 +248,7 @@ function dropSort(moved) {
   document.body.classList.remove("noselect");
   const ids = [...d.el.parentElement.querySelectorAll(d.o.sel)].map((n) => /^\d+$/.test(n.dataset.key) ? Number(n.dataset.key) : n.dataset.key);
   if (moved && d.o.onDone) d.o.onDone(ids);
+  if (d.o.onDrop) d.o.onDrop();
 }
 
 // フォルダの管理での並べ替え: フォルダを長押しして、上下にドラッグ。離したところに置いて保存する
@@ -1072,7 +1073,8 @@ function renderBoxes() {
       onDone: (keys) => {
         setPref("fixedPos", JSON.stringify({ all: keys.indexOf("all"), memo: keys.indexOf("memo") }));
         saveBoxOrder(keys.filter((k) => typeof k === "number"));
-      } });
+      },
+      onDrop: endMove });   // 指を離したら、そこで並べ替えを終わる(2026-11-26 きよさん)
     grid.appendChild(a);
   });
   const add = document.createElement("button");
@@ -1082,7 +1084,7 @@ function renderBoxes() {
   add.onclick = () => { if (!moveMode) createBox(); };
   grid.appendChild(add);
 }
-// 並べ替え中: 「完了」か、すきまを押すと終わる
+// 並べ替え中: 指を離すと終わる。「完了」・すきま・Esc でも終わる
 function endMove() { if (!moveMode) return; moveMode = false; render(); }
 $("#moveDone").onclick = endMove;
 $("#boxGrid").addEventListener("click", (e) => { if (moveMode && e.target === e.currentTarget) endMove(); });
