@@ -1,9 +1,13 @@
 const $ = (s) => document.querySelector(s);
+// 種類ごとの淡い色(カードの絵の代わり)。0:桃 1:緑 2:青 3:黄 4:灰
+const KIND_TINT = { "飲食店": 0, "お出かけ": 1, "買い物": 3, "記事": 2, "動画": 2, "レシピ": 1, "メモ": 4, "その他": 4 };
 const ICONS = { "飲食店": "🍽", "お出かけ": "📍", "買い物": "🛍", "記事": "📰", "動画": "▶", "レシピ": "🍳", "メモ": "📝", "その他": "🔖" };
 const WD = "日月火水木金土";
 let items = [];
 let memos = [];   // 種類が「メモ」のもの。一覧には出さず、メモの画面(右上のえんぴつ)だけに出す
 let folders = [];
+let boxes = [];             // 箱(フォルダより大きいまとまり)。1つも無ければ、最初の画面は今までどおりの一覧
+let activeBox = null;       // null = 最初の画面(箱の並び) | "all" = すべて | 箱のid
 let activeFolder = "all";   // "all" | "none" | フォルダid
 let activeGenre = null;      // 選んだジャンル(null = 全ジャンル)
 let activeArea = "all";      // 選んだ地域("all" | "none" = 地域なし | 地域の名前)
@@ -50,14 +54,31 @@ async function load() {
   items = (data.items || []).filter((i) => i.category !== "メモ");
   memos = (data.items || []).filter((i) => i.category === "メモ").sort((a, b) => b.created_at - a.created_at || b.id - a.id);
   folders = data.folders || [];
+  boxes = data.boxes || [];
   // 名前・地域・フォルダを直したあとに古い答えが残らないよう、覚えたジャンル・県を捨てる(お店は同じものが返ってくるので)
   genreMemo = new WeakMap(); prefMemo = new WeakMap();
-  if (activeFolder !== "all" && activeFolder !== "none" && !folders.some((f) => f.id === activeFolder)) activeFolder = "all";
+  if (typeof activeBox === "number" && !boxes.some((b) => b.id === activeBox)) activeBox = null;
+  if (activeFolder !== "all" && activeFolder !== "none" && !boxFolders().some((f) => f.id === activeFolder)) activeFolder = "all";
   render();
   renderMemos();
 }
 
 const folderName = (id) => (folders.find((f) => f.id === id) || {}).name;
+
+// ---------------------------------------------------------------- 箱(箱 > フォルダの2段)
+// お店の箱: フォルダに入っていればそのフォルダの箱、入っていなければ保存したときの箱
+function boxOf(i) {
+  const f = folders.find((x) => x.id === i.folder_id);
+  return f ? f.box_id ?? null : i.box_id ?? null;
+}
+const inBoxView = () => typeof activeBox === "number";          // ある箱の中にいる
+const gridMode = () => boxes.length > 0 && activeBox == null;    // 最初の画面が箱の並び
+const inBox = (i) => !inBoxView() || boxOf(i) === activeBox;
+const scoped = () => items.filter(inBox);                        // 今いる箱の中身(箱の外・「すべて」なら全部)
+const boxFolders = () => (inBoxView() ? folders.filter((f) => f.box_id === activeBox) : folders);
+const boxName = (id) => (boxes.find((b) => b.id === id) || {}).name;
+const BOX_TINTS = 5;   // 箱ごとの色(id で決める。並べ替えても色は変わらない)
+const tintOf = (id) => (id === "all" ? "all" : (id - 1) % BOX_TINTS);
 
 function fmtDate(sec) {
   const d = new Date(sec * 1000);
@@ -69,10 +90,12 @@ function escapeHtml(s) {
 }
 
 // ---------------------------------------------------------------- フォルダ
+// 箱の中で作ったフォルダは、その箱に入る
 async function createFolder() {
-  const name = (prompt("新しいフォルダの名前(例:行きたい店、あとで読む、旅行)") || "").trim();
+  const where = inBoxView() ? `(箱「${boxName(activeBox)}」に入ります)` : "";
+  const name = (prompt(`新しいフォルダの名前${where}\n例:行きたい店、あとで読む、御殿場 焼肉`) || "").trim();
   if (!name) return null;
-  const res = await api("/api/folders", { method: "POST", body: { name } });
+  const res = await api("/api/folders", { method: "POST", body: { name, box_id: inBoxView() ? activeBox : null } });
   if (res.error) { toast(res.error); return null; }
   toast(`「${name}」を作りました`);
   return res.id;
@@ -82,46 +105,149 @@ async function createFolder() {
 function renderFolders() {
   const box = $("#folders");
   box.innerHTML = "";
-  // フォルダが1つも無いときは、段ごと出さない(作るのは 設定 →「フォルダを作る」)
-  box.parentElement.hidden = !folders.length;
-  if (!folders.length) { if (activeFolder !== "all") activeFolder = "all"; return; }
-  const q = filterQ();
-  const count = (fn) => items.filter((i) => matches(i, q) && fn(i)).length;
-  const entries = [["all", "すべて", count(() => true)]];
-  folders.forEach((f) => entries.push([f.id, "📁 " + f.name, count((i) => i.folder_id === f.id)]));
-  if (folders.length) entries.push(["none", "フォルダなし", count((i) => !folderName(i.folder_id))]);
-  entries.forEach(([key, label, n]) => {
-    const b = document.createElement("button");
-    b.className = "fbtn" + (key === activeFolder ? " on" : "");
-    b.innerHTML = `${escapeHtml(label)}<small>${n}</small>`;
-    b.onclick = () => { activeFolder = key; render(); };
-    if (typeof key === "number") attachFolderPress(b, key);
-    box.appendChild(b);
-  });
+  const fl = boxFolders();
+  // フォルダが1つも無いときは、段ごと出さない(作るのは 設定 →「フォルダを作る」)。
+  // 箱の中では「+ フォルダを作る」だけ出す(その箱のフォルダを作れるように)。箱の並びで探しているときも出さない
+  box.parentElement.hidden = (!fl.length && !inBoxView()) || gridMode();
+  if (!fl.length) {
+    if (activeFolder !== "all") activeFolder = "all";
+    if (inBoxView()) {
+      const b = document.createElement("button");
+      b.className = "fbtn add-folder";
+      b.textContent = "+ この箱にフォルダを作る";
+      b.onclick = async () => { const id = await createFolder(); if (id) { activeFolder = id; await load(); } };
+      box.appendChild(b);
+    }
+  } else {
+    const q = filterQ();
+    const mine = scoped();
+    const count = (fn) => mine.filter((i) => matches(i, q) && fn(i)).length;
+    const entries = [["all", "すべて", count(() => true)]];
+    fl.forEach((f) => entries.push([f.id, f.name, count((i) => i.folder_id === f.id)]));
+    entries.push(["none", "フォルダなし", count((i) => !folderName(i.folder_id))]);
+    entries.forEach(([key, label, n]) => {
+      const b = document.createElement("button");
+      b.className = "fbtn" + (key === activeFolder ? " on" : "") + (typeof key === "number" ? " sortable" : "");
+      b.dataset.key = key;
+      b.innerHTML = `${escapeHtml(label)}<small>${n}</small>`;
+      b.onclick = () => { activeFolder = key; render(); };
+      if (typeof key === "number") attachFolderPress(b, key);
+      box.appendChild(b);
+    });
+  }
   // フォルダの操作は「⋯」ボタン(と、フォルダの長押し)のメニューにまとめる
   const more = $("#folderMore");   // 右端に固定(横にスクロールしても隠れない)
   more.textContent = "⋯";
   more.onclick = () => openFolderMenu(null);
 }
 
-// フォルダの長押し(スマホ)・右クリック(PC)で、そのフォルダのメニューを開く。
-// 長押しの後のクリックは無視する。長押し前に指が動いたら(横スクロール)何もしない
+// フォルダの長押し(0.5秒)で、そのまま左右に動かして並べ替え。右クリック(PC)はそのフォルダのメニュー。
+// 長押し前に指が動いたら(横スクロール)何もしない
 function attachFolderPress(b, fid) {
-  let timer = null, st = null, fired = false;
-  b.addEventListener("touchstart", (e) => {
-    const t = e.touches[0];
-    st = { x: t.clientX, y: t.clientY }; fired = false; clearTimeout(timer);
-    timer = setTimeout(() => { fired = true; openFolderMenu(fid); }, 550);
-  }, { passive: true });
-  b.addEventListener("touchmove", (e) => {
-    const t = e.touches[0];
-    if (st && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 10) clearTimeout(timer);
-  }, { passive: true });
-  ["touchend", "touchcancel"].forEach((ev) => b.addEventListener(ev, () => { clearTimeout(timer); st = null; }));
-  b.addEventListener("contextmenu", (e) => { e.preventDefault(); if (!st && !fired) openFolderMenu(fid); });
-  b.addEventListener("click", (e) => {
-    if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); }
+  attachSort(b, { sel: ".fbtn.sortable", scroller: $("#folders"), axis: "x",
+    onContext: () => openFolderMenu(fid),
+    onDone: (ids) => saveFolderOrder(ids) });
+}
+// 箱の中で並べ替えたフォルダ(一部)を、全体の並びに戻して保存する
+async function saveFolderOrder(subIds) {
+  const sub = new Set(subIds);
+  const rest = [...subIds];
+  const ids = folders.map((f) => (sub.has(f.id) ? rest.shift() : f.id));
+  folders.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+  render();
+  try {
+    const res = await api("/api/folders/order", { method: "POST", body: { ids } });
+    if (!res || !res.ok) throw new Error("ng");
+  } catch (e) { toast("並べ替えを保存できませんでした"); load(); }
+}
+
+// ---------------------------------------------------------------- 長押しで並べ替え(箱のカード・フォルダの段で共通)
+// 長押し(0.5秒)で持ち上がり、指を離さずに動かすと、重なった所と入れ替わる。離すと置かれ、すぐ保存する。
+// o = { sel: 並べ替える仲間, axis: "x" | "xy", scroller: 横に動く段, instant(): 押してすぐ持ち上げる(並べ替え中),
+//       onLift(), onDone(ids), onContext() }
+let sortDrag = null;
+function attachSort(el, o) {
+  let timer = null, st = null, fired = false, moved = false, suppress = false;
+  const begin = (x, y) => {
+    st = { x, y }; fired = false; moved = false; clearTimeout(timer);
+    if (o.instant && o.instant()) { fired = true; liftSort(el, o, x, y); }
+    else timer = setTimeout(() => { fired = true; liftSort(el, o, x, y); }, 500);
+  };
+  const move = (x, y, e) => {
+    if (!st) return;
+    if (!fired) {
+      if (Math.hypot(x - st.x, y - st.y) > 10) { clearTimeout(timer); st = null; }
+      return;
+    }
+    if (e && e.cancelable) e.preventDefault();   // 持ち上げている間は、画面をスクロールさせない
+    if (Math.hypot(x - st.x, y - st.y) > 6) moved = true;
+    sortTo(x, y);
+  };
+  const end = () => {
+    clearTimeout(timer);
+    if (st && fired) { suppress = true; dropSort(moved); }
+    st = null; fired = false;
+  };
+  el.addEventListener("touchstart", (e) => { if (e.touches.length === 1) { const t = e.touches[0]; begin(t.clientX, t.clientY); } }, { passive: true });
+  el.addEventListener("touchmove", (e) => { const t = e.touches[0]; move(t.clientX, t.clientY, e); }, { passive: false });
+  el.addEventListener("touchend", end);
+  el.addEventListener("touchcancel", end);
+  el.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents)) return;
+    begin(e.clientX, e.clientY);
+    const mm = (ev) => move(ev.clientX, ev.clientY, ev);
+    const mu = () => { document.removeEventListener("mousemove", mm); document.removeEventListener("mouseup", mu); end(); };
+    document.addEventListener("mousemove", mm);
+    document.addEventListener("mouseup", mu);
+  });
+  // スマホの長押しメニューは出さない。PC の右クリックはメニュー(あれば)
+  el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (!st && !fired && o.onContext) o.onContext(); });
+  el.addEventListener("click", (e) => {
+    if (suppress) { suppress = false; e.stopImmediatePropagation(); e.preventDefault(); }
   }, true);
+}
+function liftSort(el, o, x, y) {
+  sortDrag = { el, o, x, y };
+  el.classList.add("lifted");
+  document.body.classList.add("noselect");
+  try { navigator.vibrate && navigator.vibrate(15); } catch (e) { /* 震えなくてもよい */ }
+  if (o.onLift) o.onLift();
+  // 端まで持っていくと、画面(横の段なら段)が自動で動く
+  sortDrag.timer = setInterval(() => {
+    const d = sortDrag;
+    if (!d) return;
+    if (d.o.axis === "x" && d.o.scroller) {
+      const r = d.o.scroller.getBoundingClientRect();
+      if (d.x < r.left + 30) d.o.scroller.scrollLeft -= 6;
+      else if (d.x > r.right - 30) d.o.scroller.scrollLeft += 6;
+      else return;
+    } else {
+      if (d.y < 70) window.scrollBy(0, -8);
+      else if (d.y > innerHeight - 70) window.scrollBy(0, 8);
+      else return;
+    }
+    sortTo(d.x, d.y);
+  }, 16);
+}
+function sortTo(x, y) {
+  const d = sortDrag;
+  if (!d) return;
+  d.x = x; d.y = y;
+  const hit = document.elementFromPoint(x, y);
+  const t = hit && hit.closest(d.o.sel);
+  if (!t || t === d.el || t.parentElement !== d.el.parentElement) return;
+  const kids = [...d.el.parentElement.children];
+  d.el.parentElement.insertBefore(d.el, kids.indexOf(t) > kids.indexOf(d.el) ? t.nextSibling : t);
+}
+function dropSort(moved) {
+  const d = sortDrag;
+  if (!d) return;
+  sortDrag = null;
+  clearInterval(d.timer);
+  d.el.classList.remove("lifted");
+  document.body.classList.remove("noselect");
+  const ids = [...d.el.parentElement.querySelectorAll(d.o.sel)].map((n) => Number(n.dataset.key));
+  if (moved && d.o.onDone) d.o.onDone(ids);
 }
 
 // フォルダの管理での並べ替え: フォルダを長押しして、上下にドラッグ。離したところに置いて保存する
@@ -308,14 +434,21 @@ function openMove(item, ask = false) {
     if (cur) b.className = "cur";
     b.onclick = async () => {
       dlg.close();
-      await api(`/api/items/${item.id}`, { method: "PATCH", body: { folder: value } });
+      // 「フォルダなし」を選んだら、今いる箱の「フォルダなし」に置く(箱の外・すべてにいるときは、今の箱のまま)
+      const body = { folder: value };
+      if (value === null) body.box = inBoxView() ? activeBox : boxOf(item);
+      await api(`/api/items/${item.id}`, { method: "PATCH", body });
       toast(value === "auto" ? "自動で選びました" : "移動しました");
       load();
     };
     list.appendChild(b);
   };
   if (!ask) opt("🗂 自動で選ぶ", "auto", !item.folder_manual, "地名とジャンルで選びます");
-  folders.forEach((f) => opt("📁 " + f.name, f.id, item.folder_manual && item.folder_id === f.id));
+  // 今いる箱のフォルダを先に。ほかの箱のフォルダには箱の名前を添える(選ぶと、お店もその箱へ移る)
+  const here = boxFolders(), others = folders.filter((f) => !here.includes(f));
+  here.forEach((f) => opt("📁 " + f.name, f.id, item.folder_manual && item.folder_id === f.id));
+  others.forEach((f) => opt("📁 " + f.name, f.id, item.folder_manual && item.folder_id === f.id,
+    escapeHtml(f.box_id != null ? `箱「${boxName(f.box_id)}」` : "箱の外")));
   opt("フォルダなし", null, item.folder_manual && !folderName(item.folder_id));
   $("#moveNew").onclick = async () => {
     dlg.close();
@@ -515,7 +648,7 @@ const areaPicked = () => activeArea !== "all" || activePref !== "all";
 // 選んでいる地域・ジャンルに当たるものが無くなったら(フォルダを変えた・検索した・消した)、外す
 function fixFilters() {
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q));
+  const base = scoped().filter((i) => inFolder(i) && matches(i, q));
   if (!manyPrefs(base)) activePref = "all";
   else if (activePref === "all" && activeArea !== "all" && activeArea !== "none") {
     // 市を選んだまま、県が2つ以上ある所へ移った: その市の県を選んだことにする(段の表示と合わせる)
@@ -528,6 +661,8 @@ function fixFilters() {
 }
 // mark: 段の左端の印(📍・🍴。押せない)。rows: [値, 名前, 件数] の並び。cur: 今の値。pick(値): 押したとき
 // 「全地域」「全ジャンル」のボタンは置かない(選んだボタンをもう一度押すか「✕ 解除」で外れる)
+const PIN_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+const FORK_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 0 0 4 0V3"/><path d="M9 11v10"/><path d="M17 3c-2 2-2 6 0 8v10"/></svg>';
 function chipRow(box, mark, rows, cur, pick) {
   box.innerHTML = `<span class="chip-mark" aria-hidden="true">${mark}</span>`;
   rows.forEach(([v, label, n]) => {
@@ -543,7 +678,7 @@ function chipRow(box, mark, rows, cur, pick) {
 function renderAreas() {
   const box = $("#areaBar");
   const q = filterQ();
-  const base = items.filter((i) => isPlace(i) && inFolder(i) && matches(i, q));   // 場所だけで数える
+  const base = scoped().filter((i) => isPlace(i) && inFolder(i) && matches(i, q));   // 場所だけで数える
   if (new Set(base.map(areaOf)).size < 2) { box.hidden = true; box.innerHTML = ""; return; }
   const tally = (list, keyOf) => {
     const count = new Map();
@@ -558,7 +693,7 @@ function renderAreas() {
     const rows = [...count].filter(([p]) => p && p !== "none").sort(byN).map(([p, n]) => ["p:" + p, prefLabel(p), n]);
     if (count.has("none")) rows.push(["p:none", "県が分からない", count.get("none")]);
     if (count.has("")) rows.push(["none", "地域なし", count.get("")]);
-    chipRow(box, "📍", rows, activeArea, (v) => {
+    chipRow(box, PIN_SVG, rows, activeArea, (v) => {
       if (v.startsWith("p:")) { activePref = v.slice(2); activeArea = "all"; }
       else activeArea = v === activeArea ? "all" : v;
     });
@@ -569,7 +704,7 @@ function renderAreas() {
   if (count.has("")) rows.push(["none", "地域なし", count.get("")]);
   // 県を選んでいるときは、先頭に「‹ 静岡」(押すと県の一覧に戻る)
   if (activePref !== "all") rows.unshift(["back", "‹ " + prefLabel(activePref), base.filter((i) => inGenre(i) && prefKey(i) === activePref).length]);
-  chipRow(box, "📍", rows, activePref !== "all" && activeArea === "all" ? "back" : activeArea, (v) => {
+  chipRow(box, PIN_SVG, rows, activePref !== "all" && activeArea === "all" ? "back" : activeArea, (v) => {
     if (v === "back") { activePref = "all"; activeArea = "all"; }
     else activeArea = v === activeArea ? "all" : v;
   });
@@ -577,14 +712,14 @@ function renderAreas() {
 function renderGenres() {
   const box = $("#genreBar");
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q));
+  const base = scoped().filter((i) => inFolder(i) && matches(i, q));
   if (new Set(base.map(genreOf)).size < 2) { box.hidden = true; box.innerHTML = ""; return; }
   const shown = base.filter(inArea);
   const count = new Map();
   shown.forEach((i) => { const g = genreOf(i); count.set(g, (count.get(g) || 0) + 1); });
   const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
   const rows = order.map(([g, n]) => [g, GENRE_LABEL[g] || g, n]);
-  chipRow(box, "🍴", rows, activeGenre, (v) => { activeGenre = v === activeGenre ? null : v; });
+  chipRow(box, FORK_SVG, rows, activeGenre, (v) => { activeGenre = v === activeGenre ? null : v; });
 }
 // 今の絞り込みを1行で見せる(「📍御殿場 × 🍴焼肉 3件 ✕ 解除」)。地域もジャンルも選んでいなければ出さない
 function renderFilterLine(n) {
@@ -623,7 +758,7 @@ const filterQ = () => (searchMode === "web" ? "" : searchText());
 
 function currentList() {
   const q = filterQ();
-  const base = items.filter((i) => inFolder(i) && matches(i, q) && inGenre(i) && inArea(i));
+  const base = scoped().filter((i) => inFolder(i) && matches(i, q) && inGenre(i) && inArea(i));
   let list = base;
   if ($("#sortSel").value === "near") list.sort((a, b) => (distKm(a) ?? 1e9) - (distKm(b) ?? 1e9));
   return list;
@@ -649,6 +784,12 @@ function renderBackup() {
 
 function render() {
   renderBackup();
+  renderHeader();
+  // 箱が1つでもあれば、最初の画面は箱の並び。そこで「保存済み」を探しているときは、全部から探した一覧を出す
+  const grid = gridMode(), searching = grid && !!filterQ();
+  $("#boxHome").hidden = !grid || searching;
+  $("#listArea").hidden = grid && !searching;
+  if (grid && !searching) { renderBoxes(); renderSearchNote([]); return; }
   renderFolders();
   fixFilters();
   renderAreas();
@@ -657,6 +798,7 @@ function render() {
   renderFilterLine(list.length);
   document.querySelectorAll("#viewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
   $("#empty").hidden = items.length > 0;
+  $("#boxEmpty").hidden = !(inBoxView() && items.length && !scoped().length);
   const ul = $("#list");
   ul.innerHTML = "";
   $("#mapBox").hidden = view !== "map";
@@ -698,7 +840,10 @@ function card(i) {
   if (i.status === "processing") el.classList.add("processing");
   const th = el.querySelector(".thumb");
   th.href = link;
-  const noimg = () => { th.classList.add("noimg"); th.textContent = ICONS[i.category] || "🔖"; };
+  // 絵が無いときは、ジャンル(焼肉・スイーツ…)か種類(動画・買い物…)の文字を、種類ごとの淡い色の上に出す
+  const g = genreOf(i);
+  th.classList.add("k-" + (KIND_TINT[i.category] ?? 4));
+  const noimg = () => { th.classList.add("noimg"); th.textContent = g !== "その他" ? (GENRE_LABEL[g] || g).split("・")[0] : i.category; };
   if (i.image) {
     th.querySelector("img").src = i.image;
     th.querySelector("img").onerror = noimg;
@@ -715,7 +860,7 @@ function card(i) {
   const fname = folderName(i.folder_id);
   if (folders.length || fname) {
     // フォルダを変えるのは、この表示を押す(カードの「フォルダ」ボタンは 2026-11-11 に外した)
-    ft.textContent = (fname ? `📁 ${fname}${i.folder_manual ? "" : " ✨"}` : "📁 フォルダなし") + " ▾";
+    ft.textContent = (fname ? `${fname}${i.folder_manual ? "" : " ✨"}` : "フォルダなし") + " ▾";
     ft.title = fname && !i.folder_manual ? "自動で選んだフォルダ" : "";
     if (fname) ft.classList.add("set");
     ft.onclick = () => openMove(i);
@@ -725,7 +870,7 @@ function card(i) {
   const at = el.querySelector(".area-tag");
   const place = i.area || areaOf(i);
   if (isPlace(i)) {
-    at.textContent = place ? `📍 ${place}` : "📍 地域を入れる";
+    at.textContent = place ? place : "+ 地域を入れる";
     if (place) at.classList.add("set");
     at.title = "地域を直す";
     at.onclick = () => openArea(i);
@@ -835,6 +980,164 @@ async function renderMap(list) {
   note.textContent = `${placed.length}件を表示中` + (missing ? `(場所が分からない${missing}件は出ていません)` : "");
 }
 
+// ---------------------------------------------------------------- 箱の画面(最初の画面の箱の並び・箱の中の見出し)
+const pad2 = (n) => String(n).padStart(2, "0");
+const shortName = (t) => { t = String(t || "").replace(/\s*\([^)]*\)\s*$/, ""); return t.length > 10 ? t.slice(0, 9) + "…" : t; };
+let moveMode = false;   // 箱の並べ替え中
+
+function renderHeader() {
+  const inside = boxes.length > 0 && activeBox != null;
+  $("#brand").hidden = inside;
+  $("#boxBack").hidden = !inside;
+  $("#boxMenuBtn").hidden = !inBoxView();
+  if (!inside) return;
+  $("#boxTitle").textContent = activeBox === "all" ? "すべて" : boxName(activeBox);
+  const c = $("#boxCount");
+  c.textContent = scoped().length;
+  c.className = "box-count tint-" + tintOf(activeBox);
+  $("#boxBack").setAttribute("aria-label", `箱の並びに戻る(今は「${$("#boxTitle").textContent}」)`);
+}
+
+function renderBoxes() {
+  const grid = $("#boxGrid");
+  grid.innerHTML = "";
+  grid.classList.toggle("moving", moveMode);
+  $("#moveBar").hidden = !moveMode;
+  $("#boxStat").textContent = `${boxes.length} はこ / ${items.length} 件`;
+  const cards = [{ key: "all", name: "すべて", list: items }, ...boxes.map((b) => ({ key: b.id, name: b.name, list: items.filter((i) => boxOf(i) === b.id) }))];
+  cards.forEach((c, n) => {
+    const a = document.createElement("button");
+    a.type = "button";
+    a.className = `box-card tint-${tintOf(c.key)}` + (c.key === "all" ? "" : " sortable");
+    a.dataset.key = c.key;
+    a.innerHTML = `<span class="box-no"></span><span class="box-name"></span><span class="box-sub"></span><span class="box-n"></span>`;
+    a.querySelector(".box-no").textContent = `${pad2(n + 1)} / ${pad2(cards.length)}`;
+    a.querySelector(".box-name").textContent = c.name;
+    // 説明: 「すべて」は決まった文、ほかは新しいもの2つの名前
+    a.querySelector(".box-sub").textContent = c.key === "all" ? "箱の外のものも全部" : c.list.slice(0, 2).map((i) => shortName(i.title || i.site)).join("、") || "まだ空です";
+    a.querySelector(".box-n").textContent = c.list.length;
+    a.setAttribute("aria-label", `${c.name}(${c.list.length}件)`);
+    a.onclick = () => { if (!moveMode) enterBox(c.key); };
+    if (c.key !== "all") {
+      attachSort(a, { sel: ".box-card.sortable", axis: "xy", instant: () => moveMode,
+        onLift: () => { if (!moveMode) { moveMode = true; grid.classList.add("moving"); $("#moveBar").hidden = false; } },
+        onDone: saveBoxOrder });
+    }
+    grid.appendChild(a);
+  });
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "box-add";
+  add.textContent = "+ 箱を作る";
+  add.onclick = () => { if (!moveMode) createBox(); };
+  grid.appendChild(add);
+}
+// 並べ替え中: 「完了」か、すきまを押すと終わる
+function endMove() { if (!moveMode) return; moveMode = false; render(); }
+$("#moveDone").onclick = endMove;
+$("#boxGrid").addEventListener("click", (e) => { if (moveMode && e.target === e.currentTarget) endMove(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && moveMode) endMove(); });
+
+async function saveBoxOrder(ids) {
+  boxes.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+  try {
+    const res = await api("/api/boxes/order", { method: "POST", body: { ids } });
+    if (!res || !res.ok) throw new Error("ng");
+  } catch (e) { toast("並べ替えを保存できませんでした"); load(); return; }
+  renderBoxes();
+}
+
+// 箱に入る(スマホの「戻る」で箱の並びに戻れるよう、履歴を1つ足す)
+function enterBox(key) {
+  history.pushState({ box: key }, "");
+  activeBox = key;
+  activeFolder = "all"; activeArea = "all"; activePref = "all"; activeGenre = null;
+  render();
+  window.scrollTo(0, 0);
+}
+function leaveBox() {
+  activeBox = null;
+  activeFolder = "all"; activeArea = "all"; activePref = "all"; activeGenre = null;
+  render();
+  window.scrollTo(0, 0);
+}
+$("#boxBack").onclick = () => { if (history.state && history.state.box != null) history.back(); else leaveBox(); };
+
+async function createBox() {
+  const name = (prompt("新しい箱の名前(例:食事、サイト、イベント、旅行)") || "").trim();
+  if (!name) return null;
+  const res = await api("/api/boxes", { method: "POST", body: { name } });
+  if (res.error) { toast(res.error); return null; }
+  await load();
+  toast(`箱「${name}」を作りました`);
+  if (folders.length) chooseBoxFolders(res.id);   // 今あるフォルダから、この箱に入れるものを選んでもらう
+  return res.id;
+}
+
+// 箱に入れるフォルダを選ぶ(押すたびに入れる・出すが切り替わり、すぐ保存する)
+function chooseBoxFolders(bid) {
+  const dlg = $("#folderDlg"), list = $("#folderDlgList");
+  $("#folderDlgTitle").textContent = `箱「${boxName(bid)}」に入れるフォルダ`;
+  $("#folderDlgSub").hidden = true;
+  $("#folderOrder").hidden = true;
+  const fill = () => {
+    list.innerHTML = "";
+    folders.forEach((f) => {
+      const b = document.createElement("button");
+      const on = f.box_id === bid;
+      b.className = on ? "cur" : "";
+      b.setAttribute("aria-pressed", String(on));
+      b.innerHTML = (on ? "✓ " : "") + "📁 " + escapeHtml(f.name) +
+        (!on && f.box_id != null ? `<span class="hint">今は箱「${escapeHtml(boxName(f.box_id))}」</span>` : "");
+      b.onclick = async () => {
+        await api(`/api/folders/${f.id}`, { method: "PATCH", body: { box_id: on ? null : bid } });
+        await load();
+        fill();
+      };
+      list.appendChild(b);
+    });
+    if (!folders.length) list.innerHTML = `<p class="sheet-sub">フォルダはまだありません。箱の中で作れます。</p>`;
+  };
+  fill();
+  $("#folderDlgClose").textContent = "決める";
+  dlg.addEventListener("close", () => { $("#folderDlgClose").textContent = "閉じる"; }, { once: true });
+  if (!dlg.open) dlg.showModal();
+}
+
+// 箱のメニュー(箱の中の見出しの「⋯」): 名前を変える・入れるフォルダを選ぶ・箱を削除
+function openBoxMenu(bid) {
+  const dlg = $("#folderDlg"), list = $("#folderDlgList");
+  const name = boxName(bid);
+  $("#folderDlgTitle").textContent = "📦 " + name;
+  $("#folderDlgSub").hidden = true;
+  $("#folderOrder").hidden = true;
+  list.innerHTML = "";
+  const btn = (label, fn, cls = "") => {
+    const b = document.createElement("button");
+    b.innerHTML = label;
+    if (cls) b.className = cls;
+    b.onclick = () => { dlg.close(); fn(); };
+    list.appendChild(b);
+  };
+  btn("📁 入れるフォルダを選ぶ", () => chooseBoxFolders(bid), "accent");
+  btn("✏️ 名前を変える", async () => {
+    const v = (prompt("新しい名前", name) || "").trim();
+    if (!v || v === name) return;
+    const res = await api(`/api/boxes/${bid}`, { method: "PATCH", body: { name: v } });
+    if (res && res.error) toast(res.error);
+    load();
+  });
+  btn("🗑 箱を削除<span class=\"hint\">中のフォルダ・お店は消えません</span>", async () => {
+    if (!confirm(`箱「${name}」を削除しますか?\n中のフォルダやお店は消えずに、箱の外(「すべて」)に戻ります。`)) return;
+    await api(`/api/boxes/${bid}`, { method: "DELETE" });
+    if (history.state && history.state.box != null) history.back(); else leaveBox();
+    await load();
+    toast(`箱「${name}」を削除しました`);
+  }, "danger");
+  dlg.showModal();
+}
+$("#boxMenuBtn").onclick = () => { if (inBoxView()) openBoxMenu(activeBox); };
+
 // ---------------------------------------------------------------- 入力
 // 保存: 「保存」を押したら、フォルダを選ぶ画面を出してから保存する。
 // URLだけのときは、その画面に名前の欄も出す(通信しないので題名を取れず、そのままだとサイト名になるため)。
@@ -848,7 +1151,6 @@ function startSave() {
   $("#clipBar").hidden = true;
   const ask = needsName(v);
   const dlg = $("#saveDlg");
-  $("#saveHead").textContent = folders.length ? "どのフォルダに入れますか?" : "保存します";
   $("#saveName").textContent = v.length > 60 ? v.slice(0, 60) + "…" : v;
   const nameIn = $("#saveTitleInput");
   nameIn.hidden = !ask;
@@ -874,12 +1176,13 @@ function startSave() {
   const fill = () => {
     const memo = !hasUrl && memoChk.checked;
     list.innerHTML = "";
-    $("#saveHead").textContent = memo ? "メモに保存します" : folders.length ? "どのフォルダに入れますか?" : "保存します";
+    const fl = boxFolders();
+    $("#saveHead").textContent = memo ? "メモに保存します" : fl.length ? "どのフォルダに入れますか?" : inBoxView() ? `箱「${boxName(activeBox)}」に保存します` : "保存します";
     $("#saveNew").hidden = memo;
     if (memo) opt("📝 メモに保存する", null, "accent");
-    else if (folders.length) {
+    else if (fl.length) {
       opt('🗂 自動で選ぶ<span class="hint">名前・地名・種類で振り分け</span>', null, "accent");
-      folders.forEach((f) => opt("📁 " + escapeHtml(f.name), f.id));
+      boxFolders().forEach((f) => opt("📁 " + escapeHtml(f.name), f.id));
     } else opt("保存する", null, "accent");
   };
   memoChk.onchange = fill;
@@ -902,6 +1205,7 @@ $("#saveTitleInput").onkeydown = (e) => { if (e.key === "Enter" && !e.isComposin
 async function saveItem(v, fid, extra = {}) {
   const body = /^https?:\/\//.test(v) ? (bareUrl(v) ? { url: v, name: extra.name || "" } : { url: "", text: v }) : { text: v };
   body.folder_id = fid;
+  body.box_id = inBoxView() ? activeBox : null;   // 箱の中で保存したら、その箱のフォルダから選ぶ
   body.note = extra.note || "";
   body.kind = extra.kind || "";
   $("#addInput").value = "";
@@ -966,7 +1270,7 @@ async function afterSave(id, auto, learned = false, named = false) {
     it = items.find((x) => x.id === id);
   }
   const where = it && folderName(it.folder_id);
-  if (it && !where && auto && folders.length) { openMove(it, true); return; }
+  if (it && !where && auto && boxFolders().length) { openMove(it, true); return; }
   // learned: 2つのフォルダで迷ったが、前に自分で選んだのと同じ側に入れた
   toast(where ? `「${where}」に保存しました` + (learned ? "(前と同じ分け方)" : "") : "とっとくに保存しました");
 }
@@ -983,13 +1287,16 @@ function renderMemos() {
   cnt.textContent = n > 99 ? "99+" : String(n);
   $("#memoBtn").setAttribute("aria-label", n ? `メモ(${n}件)` : "メモ");
   setBadge(n);
-  for (const m of memos) {
+  $("#memoStat").textContent = `MEMO / ${String(n).padStart(2, "0")}`;
+  memos.forEach((m, k) => {
+    // メモはカード(2枚ずつ)。色の点は順番で変える
     const li = document.createElement("li");
-    li.innerHTML = `<p class="memo-text"></p><p class="memo-sub" hidden></p>
-      <div class="memo-foot"><span></span><button type="button" class="memo-del">削除</button></div>`;
+    li.className = "memo-card m-" + (k % 4);
+    li.innerHTML = `<p class="memo-date"><span class="dot"></span><span></span></p><p class="memo-text"></p><p class="memo-sub" hidden></p>
+      <button type="button" class="memo-del">削除</button>`;
     li.querySelector(".memo-text").textContent = m.shared_text || m.url || m.title;
     if (m.note) { const sub = li.querySelector(".memo-sub"); sub.textContent = m.note; sub.hidden = false; }
-    li.querySelector(".memo-foot span").textContent = fmtDate(m.created_at);
+    li.querySelector(".memo-date span:last-child").textContent = fmtDate(m.created_at);
     li.querySelector(".memo-del").onclick = async () => {
       // お店と同じく、確かめの画面は出さず、8秒だけ「元に戻す」を出す
       await api(`/api/items/${m.id}`, { method: "DELETE" });
@@ -998,7 +1305,7 @@ function renderMemos() {
       toast(undoItems.length > 1 ? `${undoItems.length}件を削除しました` : "メモを削除しました", undoAct());
     };
     list.appendChild(li);
-  }
+  });
 }
 // ホーム画面のアイコンの数字(Web のバッジ)。使えない環境では何もしない。通知の許可はこちらからは求めない
 function setBadge(n) {
@@ -1016,7 +1323,10 @@ function showMemo(on) {
 // スマホの「戻る」でもメモの画面が閉じるように、開くとき履歴を1つ足す
 $("#memoBtn").onclick = () => { if (memoOpen()) return; history.pushState({ memo: 1 }, ""); showMemo(true); };
 $("#memoBack").onclick = () => history.back();
-window.addEventListener("popstate", () => { if (memoOpen()) showMemo(false); });
+window.addEventListener("popstate", () => {
+  if (memoOpen()) { showMemo(false); return; }
+  if (activeBox != null && boxes.length) leaveBox();   // 箱の中から「戻る」で、箱の並びへ
+});
 $("#memoForm").onsubmit = async (e) => {
   e.preventDefault();
   const input = $("#memoInput");
@@ -1087,10 +1397,16 @@ $("#noteCancel").onclick = () => $("#noteDlg").close();
 
 // ---------------------------------------------------------------- 設定(色・データ)
 const ACCENTS = [
-  ["orange", "オレンジ", "#e8590c"], ["red", "ローズ", "#d6336c"], ["pink", "ピンク", "#c2255c"],
+  ["ai", "あお(既定)", "#3d5bf5"], ["orange", "オレンジ", "#e8590c"], ["red", "ローズ", "#d6336c"], ["pink", "ピンク", "#c2255c"],
   ["purple", "むらさき", "#7048e8"], ["blue", "あお", "#1c7ed6"], ["teal", "みずいろ", "#0c8599"],
   ["green", "みどり", "#2b8a3e"], ["brown", "ちゃいろ", "#9c6644"], ["gray", "グレー", "#495057"],
 ];
+
+const BGS = [["fuwa", "ふんわり"], ["sakura", "さくら"], ["sora", "そら"], ["mint", "ミント"], ["shiro", "しろ"]];
+const SHAPES = [["float", "浮かぶ", "少し傾いて浮く"], ["stack", "重なる", "うしろに2枚"], ["seal", "シール", "箱ごとに色を塗る"], ["plain", "すっきり", "線だけ・傾けない"]];
+
+const darkMQ = matchMedia("(prefers-color-scheme: dark)");
+darkMQ.addEventListener && darkMQ.addEventListener("change", () => applyLook(getLook()));   // 端末の明暗が変わったら合わせる
 
 function getLook() {
   try { return JSON.parse(localStorage.getItem("tottoku-look") || "{}"); } catch (e) { return {}; }
@@ -1098,9 +1414,14 @@ function getLook() {
 
 function applyLook(look) {
   const root = document.documentElement;
-  root.dataset.accent = look.accent || "orange";
+  root.dataset.accent = look.accent || "ai";
+  root.dataset.bg = look.bg || "fuwa";
+  root.dataset.card = look.card || "float";
   if (look.theme && look.theme !== "auto") root.dataset.theme = look.theme;
   else delete root.dataset.theme;
+  // 暗い表示か(「自動」なら端末の設定)。CSS は data-dark を見る
+  const dark = look.theme === "dark" || (look.theme !== "light" && darkMQ.matches);
+  if (dark) root.dataset.dark = ""; else delete root.dataset.dark;
   // スマホの上の帯(ステータスバー)の色も合わせる
   requestAnimationFrame(() => {
     const c = getComputedStyle(root).getPropertyValue("--bg").trim();
@@ -1122,7 +1443,7 @@ function renderSettings() {
   ACCENTS.forEach(([key, label, color]) => {
     const wrap = document.createElement("div");
     const b = document.createElement("button");
-    b.className = "swatch" + ((look.accent || "orange") === key ? " on" : "");
+    b.className = "swatch" + ((look.accent || "ai") === key ? " on" : "");
     b.style.background = color;
     b.setAttribute("aria-label", label);
     b.onclick = () => saveLook({ accent: key });
@@ -1130,6 +1451,29 @@ function renderSettings() {
     name.className = "swatch-name"; name.textContent = label;
     wrap.append(b, name);
     box.appendChild(wrap);
+  });
+  // 背景の色(5つ)とカードの形(4つ)。押すとすぐ変わる
+  const bgBox = $("#bgSwatches");
+  bgBox.innerHTML = "";
+  BGS.forEach(([key, label]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bg-swatch bg-" + key + ((look.bg || "fuwa") === key ? " on" : "");
+    b.innerHTML = `<span aria-hidden="true"></span>${label}`;
+    b.setAttribute("aria-pressed", String((look.bg || "fuwa") === key));
+    b.onclick = () => saveLook({ bg: key });
+    bgBox.appendChild(b);
+  });
+  const shapeBox = $("#cardShapes");
+  shapeBox.innerHTML = "";
+  SHAPES.forEach(([key, label, note]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "shape" + ((look.card || "float") === key ? " on" : "");
+    b.setAttribute("aria-pressed", String((look.card || "float") === key));
+    b.innerHTML = `<b>${label}</b><small>${note}</small>`;
+    b.onclick = () => saveLook({ card: key });
+    shapeBox.appendChild(b);
   });
   document.querySelectorAll("#themeSeg button").forEach((b) => {
     b.classList.toggle("on", (look.theme || "auto") === b.dataset.theme);
@@ -1191,8 +1535,10 @@ $("#importFile").onchange = async (e) => {
 
 $("#settingsBtn").onclick = () => {
   $("#folderSetBtn").textContent = folders.length ? "📁 フォルダの管理(作る・並べ替え・振り分け)" : "📁 フォルダを作る";
+  $("#boxSetBtn").textContent = boxes.length ? `📦 箱を作る(今 ${boxes.length}個)` : "📦 箱を作る(食事・サイト・旅行…のまとまり)";
   renderSettings(); $("#settingsDlg").showModal();
 };
+$("#boxSetBtn").onclick = async () => { $("#settingsDlg").close(); await createBox(); };
 $("#folderSetBtn").onclick = () => { $("#settingsDlg").close(); openFolderMenu(null); };
 $("#settingsClose").onclick = () => $("#settingsDlg").close();
 applyLook(getLook());

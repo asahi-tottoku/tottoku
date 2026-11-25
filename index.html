@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>とっとく</title>
-<meta name="theme-color" content="#e8590c">
+<meta name="theme-color" content="#f7f7ff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -14,17 +14,30 @@
   // 画面を描く前に、保存してある色の設定を当てる(ちらつき防止)
   try {
     const s = JSON.parse(localStorage.getItem("tottoku-look") || "{}");
-    document.documentElement.dataset.accent = s.accent || "orange";
-    if (s.theme && s.theme !== "auto") document.documentElement.dataset.theme = s.theme;
-  } catch (e) { document.documentElement.dataset.accent = "orange"; }
+    const d = document.documentElement.dataset;
+    d.accent = s.accent || "ai"; d.bg = s.bg || "fuwa"; d.card = s.card || "float";
+    if (s.theme && s.theme !== "auto") d.theme = s.theme;
+    if (s.theme === "dark" || (s.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)) d.dark = "";
+  } catch (e) { Object.assign(document.documentElement.dataset, { accent: "ai", bg: "fuwa", card: "float" }); }
 </script>
+<!-- 字の形(丸ゴシックと数字用の等幅)。読めないとき(電波が無いなど)は、端末の字で出る -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=DM+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand">
-    <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M20 14h24a3 3 0 0 1 3 3v33l-15-9-15 9V17a3 3 0 0 1 3-3z" fill="var(--surface)"/></svg>
-    <span>とっとく</span>
+  <div class="top-left">
+    <div id="brand" class="brand">とっとく</div>
+    <!-- 箱の中にいるとき: 押すと最初の画面(箱の並び)に戻る -->
+    <button id="boxBack" class="box-back" type="button" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      <span id="boxTitle"></span><span id="boxCount" class="box-count"></span>
+    </button>
+    <button id="boxMenuBtn" class="icon-btn" type="button" aria-label="この箱の名前・フォルダ・削除" title="この箱の名前・フォルダ・削除" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
+    </button>
   </div>
   <div class="top-right">
     <button id="memoBtn" class="icon-btn" aria-label="メモ" title="メモ">
@@ -41,17 +54,20 @@
   <div id="installBar" class="bar" hidden></div>
   <div id="clipBar" class="bar" hidden></div>
 
-  <form id="addForm" class="add">
-    <input id="addInput" type="text" placeholder="URLや名前を貼り付けて保存" autocomplete="off">
-    <button type="button" id="pasteBtn" class="paste-btn" title="コピーしたものを貼り付けて保存" aria-label="コピーしたものを貼り付けて保存" hidden>📋</button>
-    <button type="submit">保存</button>
+  <form id="addForm" class="add pill">
+    <input id="addInput" type="text" placeholder="URLや名前を貼り付けて保存" aria-label="URLや名前を貼り付けて保存" autocomplete="off">
+    <button type="button" id="pasteBtn" class="paste-btn" title="コピーしたものを貼り付けて保存" aria-label="コピーしたものを貼り付けて保存" hidden>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="5" width="12" height="16" rx="2.5"/><path d="M9 5a3 3 0 0 1 6 0"/></svg>
+    </button>
+    <button type="submit" class="go">保存</button>
   </form>
 
   <div class="search">
-    <div class="search-row">
-      <input id="filterInput" type="search" enterkeyhint="search" placeholder="🔍 保存したものから探す 例:焼肉 六本木" autocomplete="off">
-      <div id="searchSeg" class="seg seg-sm" role="group" aria-label="探す場所">
-        <button type="button" data-mode="saved">保存</button>
+    <div class="search-row pill soft">
+      <svg class="search-ic" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="filterInput" type="search" enterkeyhint="search" placeholder="保存したものから探す" aria-label="探す" autocomplete="off">
+      <div id="searchSeg" class="mini-seg" role="group" aria-label="探す場所">
+        <button type="button" data-mode="saved">保存済み</button>
         <button type="button" data-mode="web">Web</button>
       </div>
     </div>
@@ -60,17 +76,30 @@
 
   <section id="remind" class="remind" hidden></section>
 
+  <!-- 最初の画面(箱が1つでもあるとき): 箱のカードを2枚ずつ -->
+  <section id="boxHome" class="box-home" aria-labelledby="boxHead" hidden>
+    <div id="moveBar" class="move-bar" hidden>
+      <div><b>並べ替え中</b><small>動かしたい箱をつかんで、好きな場所へ</small></div>
+      <button id="moveDone" type="button">完了</button>
+    </div>
+    <div class="box-head"><h2 id="boxHead">わたしの箱</h2><span id="boxStat" class="mono"></span></div>
+    <div id="boxGrid" class="box-grid"></div>
+  </section>
+
+  <div id="listArea">
   <div class="folderbar">
     <div id="folders" class="folders"></div>
-    <button id="folderMore" class="fbtn more" title="フォルダの管理" aria-label="フォルダの管理">⋯</button>
+    <button id="folderMore" class="more" title="フォルダの管理" aria-label="フォルダの管理">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
+    </button>
   </div>
   <div id="areaBar" class="chips area-bar" hidden></div>
   <div id="genreBar" class="chips genre-bar" hidden></div>
 
   <div class="viewbar">
-    <div id="viewSeg" class="seg seg-sm">
-      <button data-view="list">☰ 一覧</button>
-      <button data-view="map">🗺 地図</button>
+    <div id="viewSeg" class="mini-seg dark" role="group" aria-label="見せ方">
+      <button type="button" data-view="list">一覧</button>
+      <button type="button" data-view="map">地図</button>
     </div>
     <select id="sortSel" aria-label="並べ方">
       <option value="new">新しい順</option>
@@ -82,6 +111,7 @@
 
   <div id="mapBox" class="mapbox" hidden><div id="map"></div><p id="mapNote" class="map-note"></p></div>
   <ul id="list" class="list"></ul>
+  <p id="boxEmpty" class="box-empty" hidden>この箱はまだ空です。上の欄に貼り付けて保存すると、この箱に入ります。</p>
   <div id="empty" class="empty" hidden>
   <p class="empty-title">とっとくの使い方</p>
   <ol class="howto">
@@ -90,6 +120,7 @@
     <li><b>バックアップ</b>:データはこのスマホの中だけにあります。右上の ⚙ →「全部を書き出す」で、ときどきファイルに残してください。</li>
   </ol>
   </div>
+  </div>
 </main>
 
 <div id="toast" class="toast" hidden></div>
@@ -97,13 +128,16 @@
 <!-- メモだけの場所: 文字を書いて保存しておくだけ(操作は「保存」と「削除」) -->
 <section id="memoView" class="memo-view" aria-labelledby="memoHead" hidden>
   <div class="memo-top">
-    <button id="memoBack" class="memo-back" type="button">‹ 戻る</button>
-    <h2 id="memoHead">メモ</h2>
+    <button id="memoBack" class="memo-back" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>戻る</button>
+    <span id="memoStat" class="mono"></span>
   </div>
   <div class="memo-body">
+    <h2 id="memoHead">メモ</h2>
     <form id="memoForm" class="memo-form">
-      <textarea id="memoInput" class="field" rows="3" maxlength="2000" placeholder="書いておきたいこと" aria-label="メモを書く"></textarea>
-      <button type="submit">保存</button>
+      <label for="memoInput">新しいメモ</label>
+      <textarea id="memoInput" rows="2" maxlength="2000" placeholder="思いついたことを書く"></textarea>
+      <button type="submit" class="go">保存</button>
     </form>
     <p id="memoEmpty" class="memo-empty" hidden>まだメモはありません。上に書いて「保存」を押すと、ここに残ります。</p>
     <ul id="memoList" class="memo-list"></ul>
@@ -112,7 +146,11 @@
 
 <dialog id="settingsDlg" class="sheet">
   <p class="sheet-title">設定</p>
-  <p class="set-label">テーマの色</p>
+  <p class="set-label">背景の色</p>
+  <div id="bgSwatches" class="bg-swatches"></div>
+  <p class="set-label">カードの形</p>
+  <div id="cardShapes" class="card-shapes"></div>
+  <p class="set-label">差し色(ボタンの色)</p>
   <div id="swatches" class="swatches"></div>
   <p class="set-label">画面の明るさ</p>
   <div id="themeSeg" class="seg">
@@ -120,8 +158,9 @@
     <button data-theme="light">ライト</button>
     <button data-theme="dark">ダーク</button>
   </div>
-  <p class="set-note">「自動」はスマホやパソコンの設定に合わせます。色の設定は、この端末にだけ保存されます。</p>
-  <p class="set-label">フォルダ</p>
+  <p class="set-note">背景とカードの形は、最初の画面と箱の中の両方に効きます。「自動」はスマホやパソコンの設定に合わせます。見た目の設定は、この端末にだけ保存されます。</p>
+  <p class="set-label">箱とフォルダ</p>
+  <button id="boxSetBtn" class="set-btn">📦 箱を作る</button>
   <button id="folderSetBtn" class="set-btn">📁 フォルダを作る</button>
   <p class="set-label">データ</p>
   <button id="exportBtn" class="set-btn">⬇ 全部を書き出す(バックアップ用ファイル)</button>

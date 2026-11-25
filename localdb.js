@@ -31,6 +31,9 @@
     });
     db.close();
     if (!mem) mem = { items: [], folders: [], nextItem: 1, nextFolder: 1 };
+    // 箱(v25): フォルダより大きいまとまり。箱 > フォルダの2段。前のデータには無いので足す
+    if (!Array.isArray(mem.boxes)) mem.boxes = [];
+    if (!mem.nextBox) mem.nextBox = Math.max(0, ...mem.boxes.map((b) => b.id)) + 1;
     for (const it of mem.items) {   // 辞書が増えたとき用: 名前から分かるジャンルをタグに足す
       const add = S.detectGenres(it.title || "").filter((g) => !(it.tags || []).includes(g));
       if (add.length) {
@@ -248,6 +251,7 @@
     if (!fl.length) return 0;
     const fids = new Set(fl.map((f) => f.id));
     // メモは振り分けない(メモの画面にだけ出るので、フォルダは意味が無い)。同じ名前のお店がメモにならうこともない
+    const allFl = fl, allFids = fids;
     const all = mem.items.filter((i) => i.status === "done" && i.category !== "メモ");
     const targets = all.filter((i) => !i.folder_manual && (ids == null || ids.includes(i.id)));
     const groups = new Map();
@@ -256,14 +260,23 @@
     //  2026-11-24 きよさんの了解で、お店・場所のURLも同じにした。ここだけ、お店の答えが v20 と変わる)
     const bare = (r) => !!r.url && (r.title === r.site || r.title === r.url);
     const keyOf = (r) => (bare(r) ? "" : norm(r.title)) || "#" + r.id;
+    // 箱の中で保存したもの(box_id があるもの)は、その箱のフォルダだけから選ぶ。箱が無ければ今までと同じ
+    const boxKey = (r) => (r.box_id != null && mem.boxes.some((b) => b.id === r.box_id) ? r.box_id : null);
     for (const r of targets) {
-      const k = keyOf(r);
+      const k = boxKey(r) + "\u0000" + keyOf(r);
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(r);
     }
     let moved = 0;
-    const sigs = new Map();
-    for (const [key, rows] of groups) {
+    const sigsByBox = new Map();   // 迷ったときの覚え(箱ごと。比べるフォルダが箱で違うので)
+    for (const rows of groups.values()) {
+      const key = keyOf(rows[0]);
+      const bk = boxKey(rows[0]);
+      const fl = bk == null ? allFl : allFl.filter((f) => f.box_id === bk);
+      if (!fl.length) continue;
+      if (!sigsByBox.has(bk)) sigsByBox.set(bk, new Map());
+      const sigs = sigsByBox.get(bk);
+      const fids = bk == null ? allFids : new Set(fl.map((f) => f.id));
       const same = all.filter((r) => keyOf(r) === key && fids.has(r.folder_id));
       const manual = same.filter((r) => r.folder_manual);
       let fid = null;
@@ -313,10 +326,17 @@
   }
 
   const findName = (name) => mem.folders.find((f) => S.fnorm(f.name) === S.fnorm(name));
+  const folderBox = (fid) => (mem.folders.find((f) => f.id === fid) || {}).box_id ?? null;
+  const sortedBoxes = () => [...mem.boxes].sort((a, b) => (a.position ?? 1e9) - (b.position ?? 1e9) || a.created_at - b.created_at);
+  // フォルダに入ったものは、そのフォルダの箱に合わせる(自動で入ったときも)
+  const syncBoxes = () => mem.items.forEach((i) => {
+    if (i.folder_id != null && mem.folders.some((f) => f.id === i.folder_id)) i.box_id = folderBox(i.folder_id);
+  });
 
   // ---------------------------------------------------------------- 保存
   // name: 保存の画面で自分で付けた名前(そのまま名前にする)。title: 共有メニューから届いたページの題名(サイト名の飾りを外す)
-  function addItem({ url = "", text = "", title = "", name = "", note = "", kind = "", folder_id = null }) {
+  // box_id: 箱の中で保存したときの箱(フォルダはその箱の中から選ぶ)。共有メニューなど外からは null
+  function addItem({ url = "", text = "", title = "", name = "", note = "", kind = "", folder_id = null, box_id = null }) {
     url = String(url || "").trim();
     name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 120);
     text = [name || title, text].filter(Boolean).join("\n").trim();
@@ -327,6 +347,7 @@
       category: "その他", area: "", tags: [], summary: "", note: "", lat: null, lng: null,
       status: "processing", created_at: Date.now() / 1000,
       folder_id: folder_id ?? null, folder_manual: folder_id ? 1 : 0,
+      box_id: folder_id ? folderBox(folder_id) : mem.boxes.some((b) => b.id === box_id) ? box_id : null,
       recommender: "", review: "", rating: null, visited_at: null, snooze_until: null,
     };
     organize(it);
@@ -346,7 +367,7 @@
   // ---------------------------------------------------------------- 書き出し・読み込み
   function exportData() {
     return { app: "tottoku", version: 1, exported_at: new Date().toISOString(),
-      folders: sortedFolders(), items: [...mem.items].sort((a, b) => a.created_at - b.created_at) };
+      boxes: sortedBoxes(), folders: sortedFolders(), items: [...mem.items].sort((a, b) => a.created_at - b.created_at) };
   }
 
   // PC版の「全部を書き出す」ファイルもそのまま読める。今のデータは全部置き換える
@@ -354,8 +375,15 @@
     if (!data || data.app !== "tottoku" || !Array.isArray(data.items) || !Array.isArray(data.folders)) {
       throw new Error("とっとくのバックアップファイルではありません");
     }
+    // 箱は v25 から。前のファイル(PC版も)には無いので、無ければ箱なし
+    const boxes = (Array.isArray(data.boxes) ? data.boxes : []).map((b, n) => ({
+      id: Number(b.id), name: String(b.name || "").slice(0, 20), created_at: Number(b.created_at) || n, position: n,
+    })).filter((b) => b.id && b.name);
+    const bids = new Set(boxes.map((b) => b.id));
+    const okBox = (v) => (v != null && bids.has(Number(v)) ? Number(v) : null);
     const folders = data.folders.map((f, n) => ({
       id: Number(f.id), name: String(f.name || "").slice(0, 30), created_at: Number(f.created_at) || n, position: n,
+      box_id: okBox(f.box_id),
     })).filter((f) => f.id && f.name);
     const fids = new Set(folders.map((f) => f.id));
     const items = data.items.map((r) => {
@@ -365,14 +393,17 @@
       it.status = "done";
       it.created_at = Number(r.created_at) || Date.now() / 1000;
       if (!fids.has(it.folder_id)) { it.folder_id = null; it.folder_manual = 0; }
+      it.box_id = okBox(r.box_id);
       return it;
     }).filter((it) => it.id);
     mem = {
-      items, folders,
+      items, folders, boxes,
       nextItem: Math.max(0, ...items.map((i) => i.id)) + 1,
       nextFolder: Math.max(0, ...folders.map((f) => f.id)) + 1,
+      nextBox: Math.max(0, ...boxes.map((b) => b.id)) + 1,
     };
-    return { items: items.length, folders: folders.length };
+    syncBoxes();
+    return { items: items.length, folders: folders.length, boxes: boxes.length };
   }
 
   // ---------------------------------------------------------------- PC版と同じ形の「API」
@@ -381,13 +412,47 @@
     let m;
     const out = (() => {
       if (method === "GET" && path === "/api/items") {
-        return { items: [...mem.items].sort((a, b) => b.created_at - a.created_at), folders: sortedFolders().map(({ id, name }) => ({ id, name })) };
+        return { items: [...mem.items].sort((a, b) => b.created_at - a.created_at),
+          folders: sortedFolders().map(({ id, name, box_id }) => ({ id, name, box_id: box_id ?? null })),
+          boxes: sortedBoxes().map(({ id, name }) => ({ id, name })) };
+      }
+      // ---- 箱(名前を付けられる大きなまとまり。中にフォルダが入る)
+      if (method === "POST" && path === "/api/boxes") {
+        const name = String(body.name || "").trim().slice(0, 20);
+        if (!name) return { error: "名前が空です" };
+        if (mem.boxes.some((b) => S.fnorm(b.name) === S.fnorm(name))) return { error: "同じ名前の箱があります" };
+        const b = { id: mem.nextBox++, name, created_at: Date.now() / 1000, position: null };
+        mem.boxes.push(b);
+        return { id: b.id };
+      }
+      if (method === "POST" && path === "/api/boxes/order") {
+        (body.ids || []).forEach((id, n) => { const b = mem.boxes.find((x) => x.id === Number(id)); if (b) b.position = n; });
+        return { ok: true };
+      }
+      if ((m = path.match(/^\/api\/boxes\/(\d+)$/))) {
+        const bid = Number(m[1]);
+        const b = mem.boxes.find((x) => x.id === bid);
+        if (!b) return { error: "箱が見つかりません" };
+        if (method === "PATCH") {
+          const name = String(body.name || "").trim().slice(0, 20);
+          if (!name) return { error: "名前が空です" };
+          if (mem.boxes.some((x) => x.id !== bid && S.fnorm(x.name) === S.fnorm(name))) return { error: "同じ名前の箱があります" };
+          b.name = name;
+          return { ok: true };
+        }
+        if (method === "DELETE") {   // 中のフォルダ・お店は消さず、箱の外に出す
+          mem.folders.forEach((f) => { if (f.box_id === bid) f.box_id = null; });
+          mem.items.forEach((i) => { if (i.box_id === bid) i.box_id = null; });
+          mem.boxes = mem.boxes.filter((x) => x.id !== bid);
+          return { ok: true };
+        }
       }
       if (method === "POST" && path === "/api/items/restore") {   // 消した直後の「元に戻す」
         const it = body.item;
         if (it && it.id != null && !mem.items.some((i) => i.id === it.id)) {
           // その間にフォルダが消されていたら「フォルダなし」に戻す(無いフォルダの番号を残さない)
           if (it.folder_id != null && !mem.folders.some((f) => f.id === it.folder_id)) { it.folder_id = null; it.folder_manual = 0; }
+          if (it.box_id != null && !mem.boxes.some((b) => b.id === it.box_id)) it.box_id = null;
           mem.items.push(it);
         }
         return { ok: true };
@@ -397,7 +462,8 @@
         const name = String(body.name || "").trim().slice(0, 30);
         if (!name) return { error: "名前が空です" };
         if (findName(name)) return { error: "同じ名前のフォルダがあります" };
-        const f = { id: mem.nextFolder++, name, created_at: Date.now() / 1000, position: null };
+        const box = mem.boxes.some((b) => b.id === body.box_id) ? body.box_id : null;   // 箱の中で作ったら、その箱に入れる
+        const f = { id: mem.nextFolder++, name, created_at: Date.now() / 1000, position: null, box_id: box };
         mem.folders.push(f);
         return { id: f.id };
       }
@@ -409,13 +475,17 @@
       if ((m = path.match(/^\/api\/folders\/(\d+)$/))) {
         const fid = Number(m[1]);
         if (method === "PATCH") {
+          const f = mem.folders.find((x) => x.id === fid);
+          if ("box_id" in body) {   // 入れる箱を変える(null = 箱に入れない)。中のお店も一緒に移る
+            if (f) f.box_id = mem.boxes.some((b) => b.id === body.box_id) ? body.box_id : null;
+            return { ok: true };
+          }
           const name = String(body.name || "").trim().slice(0, 30);
           if (!name) return { error: "名前が空です" };
-          const f = mem.folders.find((x) => x.id === fid);
           if (f) f.name = name;
           return { ok: true };
         }
-        if (method === "DELETE") {   // 中身は消さず「フォルダなし」に戻す
+        if (method === "DELETE") {   // 中身は消さず「フォルダなし」に戻す(箱の中のフォルダなら、その箱の「フォルダなし」)
           mem.items.forEach((i) => { if (i.folder_id === fid) { i.folder_id = null; i.folder_manual = 0; } });
           mem.folders = mem.folders.filter((f) => f.id !== fid);
           return { ok: true };
@@ -438,6 +508,8 @@
             if (body.folder === "auto") it.folder_manual = 0;
             else { it.folder_id = body.folder; it.folder_manual = 1; }
           }
+          // フォルダなしにしたとき、どの箱の「フォルダなし」に置くか(箱の中で選んだら、その箱)
+          if ("box" in body) it.box_id = mem.boxes.some((b) => b.id === body.box) ? body.box : null;
           if (body.folder === "auto" || (!it.folder_manual && ("title" in body || "area" in body || "note" in body))) {
             assignFolders([id]);
           }
@@ -446,7 +518,7 @@
       }
       return { error: "not found" };
     })();
-    if (method !== "GET") await saveState();
+    if (method !== "GET") { syncBoxes(); await saveState(); }
     return out;
   }
 
