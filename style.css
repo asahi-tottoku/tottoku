@@ -263,6 +263,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb.noimg { display: grid; place-items: center; padding: 4px; font-size: 12px; font-weight: 700; text-align: center; line-height: 1.3; text-decoration: none; overflow-wrap: anywhere; }
 .thumb.noimg.long { font-size: 10px; }
+.thumb.bt { --k: var(--tint); --ki: var(--ink); }   /* 箱に入っているお店は、箱のカードと同じ色 */
 .body { flex: 1; min-width: 0; }
 .meta { display: flex; gap: 6px; flex-wrap: wrap; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; color: var(--muted); }
 .dist { color: var(--accent); font-weight: 700; }

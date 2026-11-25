@@ -863,7 +863,9 @@ function card(i) {
   // 箱に入っていなければ、今までどおりジャンル(焼肉・スイーツ…)か種類(動画・買い物…)
   const g = genreOf(i);
   const bname = boxOf(i) != null ? boxName(boxOf(i)) : "";
-  th.classList.add("k-" + (KIND_TINT[i.category] ?? 4));
+  // 色: 箱に入っていれば箱のカードと同じ色(種類ごとだと同じ箱の中で色がばらばらになるため)。箱の外は種類ごとの色
+  if (bname) th.classList.add("bt", "tint-" + tintOf(boxOf(i)));
+  else th.classList.add("k-" + (KIND_TINT[i.category] ?? 4));
   const noimg = () => {
     th.classList.add("noimg");
     th.textContent = bname || (g !== "その他" ? (GENRE_LABEL[g] || g).split("・")[0] : i.category);
