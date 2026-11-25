@@ -202,6 +202,8 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .fbtn { flex: none; display: flex; align-items: center; gap: 5px; height: 44px; padding: 0 12px; border: none; border-radius: 0;
   border-bottom: 3px solid transparent; background: none; color: var(--muted); font-size: 14px; font-weight: 700;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.fbtn { max-width: 14em; }   /* 長いフォルダ名のタブが画面の幅より広くならないように */
+.fbtn-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .fbtn small { font-weight: 500; font-size: 11px; font-family: var(--mono); color: var(--muted); }
 .fbtn.on { color: var(--text); font-weight: 900; border-bottom-color: var(--accent); }
 .fbtn.lifted { background: var(--surface); border-radius: 16px; border-bottom-color: transparent; color: var(--text);
@@ -213,7 +215,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 10px 0 0; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chip-mark { flex: none; display: grid; place-items: center; width: 20px; color: var(--muted); }
-.chip { flex: none; font-size: 12px; font-weight: 700; padding: 0 13px; min-height: 34px; border-radius: 17px;
+.chip { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 700; padding: 0 13px; min-height: 34px; border-radius: 17px;
   background: var(--surface); border: none; color: var(--soft); box-shadow: var(--shade); }
 .chip.on { background: var(--accent); color: var(--on-accent); }
 .chip small { opacity: .75; margin-left: 4px; font-family: var(--mono); font-weight: 500; }
@@ -258,15 +260,15 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .area-tag.set { background: var(--t1); color: var(--i1); border-color: transparent; }
 .title { display: block; font-size: 16px; font-weight: 900; line-height: 1.35; margin: 5px 0 2px; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
 .title:hover { text-decoration: underline; }
-.summary { margin: 0; font-size: 13px; color: var(--muted); }
+.summary { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .summary:empty, .who:empty { display: none; }
-.who { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
-.note { margin: 6px 0 0; padding: 6px 10px; border-radius: 12px; background: var(--bg); font-size: 12px; color: var(--soft); white-space: pre-wrap; }
+.who { margin: 2px 0 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.note { margin: 6px 0 0; padding: 6px 10px; border-radius: 12px; background: var(--bg); font-size: 12px; color: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; }
 .note:empty { display: none; }
 .shopinfo { margin-top: 6px; font-size: 12px; }
 .shopinfo summary { cursor: pointer; color: var(--muted); }
 .shopinfo summary.closed { color: var(--danger); font-weight: 700; }
-.shopinfo-body { margin-top: 4px; padding: 8px 10px; background: var(--bg); border-radius: 12px; display: grid; gap: 4px; }
+.shopinfo-body { margin-top: 4px; padding: 8px 10px; background: var(--bg); border-radius: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; overflow-wrap: anywhere; }
 .shopinfo-body b { display: inline-block; min-width: 4.5em; color: var(--muted); }
 .shopinfo-body pre { margin: 2px 0 0; font: inherit; white-space: pre-wrap; }
 .shopinfo-body a { color: var(--accent); }
@@ -289,7 +291,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30;
   background: var(--text); color: var(--bg); padding: 11px 20px; border-radius: 999px; font-size: 14px; font-weight: 700;
-  box-shadow: 0 10px 30px rgba(20,24,60,.3); width: max-content; max-width: calc(100% - 32px); }
+  box-shadow: 0 10px 30px rgba(20,24,60,.3); width: max-content; max-width: calc(100% - 32px); overflow-wrap: anywhere; }
 .toast button { margin-left: 12px; padding: 0 2px; font: inherit; font-weight: 900; color: inherit; background: none; border: none; text-decoration: underline; }
 
 /* ---------- カードの形(設定で選ぶ。箱のカード・お店のカード・メモに効く) ---------- */
@@ -365,10 +367,11 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .sheet { border: none; border-radius: 26px; padding: 20px 18px 16px; width: min(420px, calc(100% - 28px));
   background: var(--surface); color: var(--text); box-shadow: 0 24px 60px rgba(20,24,60,.35); }
 .sheet::backdrop { background: rgba(20,24,60,.4); }
-.sheet-title { margin: 0; font-weight: 900; font-size: 17px; }
+.sheet-title { margin: 0; font-weight: 900; font-size: 17px; overflow-wrap: anywhere; }
 .sheet-sub { margin: 2px 0 12px; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sheet-list { display: grid; gap: 6px; max-height: 50vh; overflow-y: auto; margin-top: 8px; }
-.sheet-list button { text-align: left; padding: 12px 14px; font-size: 15px; border: none; background: var(--bg); border-radius: 16px; white-space: normal; }
+/* grid の列は minmax(0, 1fr): 長い名前で列が広がって、画面の外にはみ出さないように */
+.sheet-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 50vh; overflow-y: auto; margin-top: 8px; }
+.sheet-list button { text-align: left; padding: 12px 14px; font-size: 15px; border: none; background: var(--bg); border-radius: 16px; white-space: normal; overflow-wrap: anywhere; }
 .sheet-list button.cur { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent); }
 .sheet-list .hint { font-size: 12px; color: var(--muted); margin-left: 6px; font-weight: 500; }
 .sheet-list button.accent { color: var(--accent); }
@@ -386,8 +389,8 @@ textarea.field { resize: vertical; }
 .save-note { margin-bottom: 10px; resize: none; }
 .save-memo { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 14px; }
 .save-memo input { width: 18px; height: 18px; accent-color: var(--accent); }
-.order-sub { margin: 14px 0 6px; }
-.folder-order { display: grid; gap: 6px; max-height: 42vh; overflow-y: auto; margin-bottom: 4px; padding: 2px 2px 8px; }
+.order-sub { margin: 14px 0 6px; white-space: normal; overflow: visible; }   /* 説明は折り返して全部見せる */
+.folder-order { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 42vh; overflow-y: auto; margin-bottom: 4px; padding: 2px 2px 8px; }
 .frow { display: flex; gap: 6px; align-items: stretch; border-radius: 16px; }
 .frow-name { flex: 1; min-width: 0; text-align: left; padding: 12px 14px; font-size: 15px; border: none; background: var(--bg); border-radius: 16px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

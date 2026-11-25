@@ -129,7 +129,7 @@ function renderFolders() {
       const b = document.createElement("button");
       b.className = "fbtn" + (key === activeFolder ? " on" : "") + (typeof key === "number" ? " sortable" : "");
       b.dataset.key = key;
-      b.innerHTML = `${escapeHtml(label)}<small>${n}</small>`;
+      b.innerHTML = `<span class="fbtn-name">${escapeHtml(label)}</span><small>${n}</small>`;   // 長い名前は「…」で省く
       b.onclick = () => { activeFolder = key; render(); };
       if (typeof key === "number") attachFolderPress(b, key);
       box.appendChild(b);
