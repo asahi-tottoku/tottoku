@@ -201,12 +201,6 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .box-grid.moving .box-card.sortable { touch-action: none; }
 .box-card.lifted { z-index: 3; opacity: 1; transform: rotate(3deg) scale(1.06) !important;
   box-shadow: 0 34px 50px -18px var(--glow), 0 6px 14px rgba(40,50,110,.14); }
-.move-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 56px; padding: 0 6px 0 18px; margin-bottom: 14px;
-  border-radius: 28px; background: #23264a; color: #fff; }
-.move-bar div { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
-.move-bar b { font-size: 14px; font-weight: 900; }
-.move-bar small { font-size: 11px; color: #c5c9ee; }
-.move-bar button { flex: none; height: 44px; padding: 0 22px; border: none; border-radius: 22px; background: #fff; color: #23264a; font-weight: 900; }
 
 /* ---------- 箱の中: フォルダの段(下線のタブ) ---------- */
 #listArea { margin-top: 14px; }

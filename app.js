@@ -1044,7 +1044,6 @@ function renderBoxes() {
   const grid = $("#boxGrid");
   grid.innerHTML = "";
   grid.classList.toggle("moving", moveMode);
-  $("#moveBar").hidden = !moveMode;
   $("#boxStat").textContent = `${boxes.length} はこ / ${items.length} 件`;
   // 「すべて」と「メモ」(押すとメモの画面)は決まった箱。消せないが、並べ替えはできる。
   // 箱の順はデータに、この2つの位置はこの端末(tottoku-fixedPos)に覚える
@@ -1069,7 +1068,7 @@ function renderBoxes() {
     a.setAttribute("aria-label", `${c.name}(${c.list.length}件)`);
     a.onclick = () => { if (moveMode) return; if (c.key === "memo") $("#memoBtn").click(); else enterBox(c.key); };
     attachSort(a, { sel: ".box-card.sortable", axis: "xy", instant: () => moveMode,
-      onLift: () => { if (!moveMode) { moveMode = true; grid.classList.add("moving"); $("#moveBar").hidden = false; } },
+      onLift: () => { if (!moveMode) { moveMode = true; grid.classList.add("moving"); } },
       onDone: (keys) => {
         setPref("fixedPos", JSON.stringify({ all: keys.indexOf("all"), memo: keys.indexOf("memo") }));
         saveBoxOrder(keys.filter((k) => typeof k === "number"));
@@ -1084,9 +1083,8 @@ function renderBoxes() {
   add.onclick = () => { if (!moveMode) createBox(); };
   grid.appendChild(add);
 }
-// 並べ替え中: 指を離すと終わる。「完了」・すきま・Esc でも終わる
+// 並べ替え中: 指を離すと終わる(「並べ替え中」の帯と「完了」は 2026-11-26 に外した)。すきま・Esc でも終わる
 function endMove() { if (!moveMode) return; moveMode = false; render(); }
-$("#moveDone").onclick = endMove;
 $("#boxGrid").addEventListener("click", (e) => { if (moveMode && e.target === e.currentTarget) endMove(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && moveMode) endMove(); });
 
