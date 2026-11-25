@@ -112,7 +112,11 @@
   const PLACES = [];            // { pref, name, lat, lng } 座標からいちばん近い市区町村を探す用
   let PREF_RE = null;           // 都道府県名・郡名(文から地名を探す前に外す。「長野県北佐久郡軽井沢町」を「長野」「佐久」と間違えない)
   const PREF_OF = new Map();    // まとめた地域の名前(「御殿場」)→ 都道府県(「静岡県」)。1つに決まるものだけ
+  const PREF_KEYS = new Map();  // 都道府県(「東京都」)→ その中の市区町村(AREAS のキー)。「東京」フォルダ用
   if (root.PLACES_JP) {
+    // 手書きの辞書に無い町の名前(Web版だけ。PC版との一致テストを変えないため、ここで足す)
+    AREAS["中央区"].push("八丁堀", "新富町", "新川", "入船", "湊", "明石町", "晴海", "佃", "浜町", "日本橋浜町",
+      "小伝馬町", "馬喰町", "宝町", "水天宮前");
     const counties = new Set();
     const byKey = new Map();    // 市区町村(「御殿場市」)→ その名前がある都道府県
     for (const p of root.PLACES_JP.list) {
@@ -124,6 +128,8 @@
       PLACES.push({ pref: p.pref, name, lat: p.lat, lng: p.lng });
       if (!AREAS[key]) { AREAS[key] = []; NATIONAL.add(key); }
       if (m && !AREAS[key].includes(name)) AREAS[key].push(name);
+      if (!PREF_KEYS.has(p.pref)) PREF_KEYS.set(p.pref, new Set());
+      PREF_KEYS.get(p.pref).add(key);
       if (!byKey.has(key)) byKey.set(key, new Set());
       byKey.get(key).add(p.pref);
     }
@@ -140,6 +146,12 @@
     for (const [g, c] of cand) {
       const first = c.find((s) => s.size);
       if (first.size === 1) PREF_OF.set(g, [...first][0]);
+    }
+    // 手書きの辞書の町の名前(「銀座」「八丁堀」)も、その市区の県に(市区の県が1つに決まるときだけ)
+    for (const [key, members] of Object.entries(AREAS)) {
+      const ps = byKey.get(key);
+      if (NATIONAL.has(key) || !ps || ps.size !== 1) continue;
+      for (const m of members) if (!PREF_OF.has(bare(m))) PREF_OF.set(bare(m), [...ps][0]);
     }
     PREF_RE = new RegExp([...root.PLACES_JP.prefs, ...counties].map((s) => s.normalize("NFKC")).join("|"), "g");
   }
@@ -181,6 +193,7 @@
   // 「港区」「北区」などは大阪市港区・名古屋市北区にもあるので、「〇〇市港区」は除く
   function placePattern(word) {
     const w = esc(fnorm(word));
+    if (NATIONAL.size && word.startsWith("京都")) return "(?<!東)" + w;   // 「東京都」の中の「京都」に合わせない
     return word.endsWith("区") ? "(?<!市)" + w : w;
   }
 
@@ -208,6 +221,15 @@
         return ["place", [token, ...areaWords(key)].map(placePattern), null];
       }
     }
+    // 都道府県の名前(「東京」「東京都」「神奈川」)のフォルダは、その県の市区町村・町の名前のどれかに合えばよい(Web版だけ)。
+    // 市と同じ名前の県(「静岡」「京都」)は、上で市として決まるので今までどおり
+    for (const [pref, keys] of PREF_KEYS) {
+      const short = pref === "北海道" ? pref : pref.replace(/[都府県]$/, "");
+      if (t !== fnorm(pref) && t !== fnorm(short)) continue;
+      const words = [pref, short];
+      for (const k of keys) words.push(...areaWords(k));
+      return ["pref", ["(?:" + [...new Set(words)].map(placePattern).join("|") + ")"], null];
+    }
     return ["word", [esc(t)], null];
   }
 
@@ -222,10 +244,10 @@
     const tokens = splitName(name);
     if (!tokens.length) return null;
     const anyGenre = NATIONAL.size > 0;
-    let child = 0, n = 0, genreSeen = false, genreHit = false;
+    let child = 0, n = 0, genreSeen = false, genreHit = false, hasPref = false, hasPlace = false;
     for (const tok of tokens) {
       const [kind, pats, parent] = resolveToken(tok);
-      const text = kind === "place" ? placeText : genreText + " " + placeText;
+      const text = kind === "place" || kind === "pref" ? placeText : genreText + " " + placeText;
       const ok = pats.some((p) => new RegExp(p).test(text));
       if (anyGenre && kind === "genre") {
         genreSeen = true;
@@ -234,10 +256,15 @@
       }
       if (!ok) return null;
       n++;
+      if (kind === "pref") hasPref = true;
+      if (kind === "place") hasPlace = true;
       if (kind === "genre" && parent) child++;
     }
     if (genreSeen) { if (!genreHit) return null; n++; }
-    return [n, child];
+    const r = [n, child];
+    r.pref = hasPref && !hasPlace;   // 県だけで合った(「東京」)。同じくらい合う市や町のフォルダ(「渋谷」)があれば、そちらにする
+    r.place = hasPlace;
+    return r;
   }
 
   // アイテムから、ジャンルを見る文と地名を見る文を作る。
@@ -266,7 +293,9 @@
     }
     if (!scored.length) return [];
     const best = scored.reduce((m, x) => (cmp(x[0], m) > 0 ? x[0] : m), scored[0][0]);
-    return scored.filter(([s]) => cmp(s, best) === 0).map(([, id]) => id);
+    let top = scored.filter(([s]) => cmp(s, best) === 0);
+    if (top.some(([s]) => s.place) && top.some(([s]) => s.pref)) top = top.filter(([s]) => !s.pref);
+    return top.map(([, id]) => id);
   }
 
   // items(同じお店をまとめたアイテムのリスト)に合うフォルダの id を返す。決めきれなければ null。
@@ -310,6 +339,8 @@
     "ラーメン": ["らぁ麺", "らあめん", "ラー麺", "麺屋"],
     "中華": ["ぎょうざ", "ギョーザ", "ギョウザ"],
     "イタリアン": ["ピッツェリア", "スパゲッティ", "スパゲティ"],
+    "スイーツ": ["カヌレ", "マカロン", "フィナンシェ", "マドレーヌ", "シュークリーム", "エクレア", "モンブラン", "バウムクーヘン",
+                "マリトッツォ", "ワッフル", "チーズケーキ", "どら焼", "たい焼", "大福", "団子", "あんみつ"],
     "パン": ["メロンパン", "カレーパン", "コッペパン", "クロワッサン", "ベーグル", "フランスパン", "クリームパン", "アンパン",
              "ジャムパン"],
     "バー": ["ジャズバー", "スタンディングバー", "ミュージックバー", "カクテルバー", "ウイスキーバー", "ウィスキーバー",
