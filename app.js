@@ -977,6 +977,12 @@ function renderMemos() {
   const list = $("#memoList");
   list.innerHTML = "";
   $("#memoEmpty").hidden = memos.length > 0;
+  // えんぴつのボタンと、ホーム画面のアイコンに、メモの件数を出す(0件なら出さない)
+  const n = memos.length, cnt = $("#memoCount");
+  cnt.hidden = !n;
+  cnt.textContent = n > 99 ? "99+" : String(n);
+  $("#memoBtn").setAttribute("aria-label", n ? `メモ(${n}件)` : "メモ");
+  setBadge(n);
   for (const m of memos) {
     const li = document.createElement("li");
     li.innerHTML = `<p class="memo-text"></p><p class="memo-sub" hidden></p>
@@ -993,6 +999,13 @@ function renderMemos() {
     };
     list.appendChild(li);
   }
+}
+// ホーム画面のアイコンの数字(Web のバッジ)。使えない環境では何もしない。通知の許可はこちらからは求めない
+function setBadge(n) {
+  try {
+    if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
+    else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  } catch (e) { /* 出せなくてもよい */ }
 }
 const memoOpen = () => !$("#memoView").hidden;
 function showMemo(on) {

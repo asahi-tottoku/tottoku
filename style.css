@@ -360,6 +360,13 @@ button.set-btn { width: 100%; margin-bottom: 8px; font: inherit; background: non
 
 /* ---------- メモだけの場所(右上のえんぴつで開く。書いて保存しておくだけ) ---------- */
 .toast { z-index: 30; }   /* メモの画面の上にも「元に戻す」を出す */
+#memoBtn { position: relative; }
+.memo-count {
+  position: absolute; top: 0; right: -2px; min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; line-height: 17px; text-align: center;
+  pointer-events: none;
+}
+.memo-count[hidden] { display: none; }
 .memo-view { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--bg); }
 .memo-view[hidden] { display: none; }
 .memo-top {
