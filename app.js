@@ -395,7 +395,7 @@ function openFolderMenu(fid) {
       load();
     });
     btn("🗑 フォルダを削除<span class=\"hint\">中身は消えません</span>", async () => {
-      if (!confirm(`フォルダ「${name}」を削除しますか?\n中に入っているものは消えずに「フォルダなし」に戻ります。`)) return;
+      if (!await askYesNo(`フォルダ「${name}」を削除してよろしいですか?`, "中に入っているものは消えずに「フォルダなし」に戻ります。")) return;
       await api(`/api/folders/${fid}`, { method: "DELETE" });
       if (activeFolder === fid) activeFolder = "all";
       load();
@@ -413,9 +413,26 @@ async function runAutosort() {
   load();
 }
 
-function offerAutosort() {
+// はい・いいえ の確かめ。「はい」で true。外を押す・Esc・「いいえ」は false
+function askYesNo(title, sub = "", danger = true) {
+  const dlg = $("#askDlg");
+  $("#askTitle").textContent = title;
+  $("#askSub").textContent = sub;
+  $("#askYes").classList.toggle("danger", danger);
+  return new Promise((resolve) => {
+    let answer = false;
+    $("#askYes").onclick = () => { answer = true; dlg.close(); };
+    $("#askNo").onclick = () => dlg.close();
+    dlg.onclick = (e) => { if (e.target === dlg) dlg.close(); };
+    dlg.onclose = () => resolve(answer);
+    dlg.showModal();
+    $("#askNo").focus();   // うっかり Enter で消さないよう、いいえ を選んだ状態にする
+  });
+}
+
+async function offerAutosort() {
   if (items.some((i) => !i.folder_manual) &&
-      confirm("保存済みのものを、自動でフォルダに振り分け直しますか?\n(自分で選んだものは動かしません)")) runAutosort();
+      await askYesNo("保存済みのものを、自動でフォルダに振り分け直しますか?", "自分で選んだものは動かしません。", false)) runAutosort();
 }
 
 // フォルダ選択ダイアログ。ask: 保存した直後に「自動では決められなかった」ときに出す
@@ -914,7 +931,9 @@ function card(i) {
   }
   el.querySelector(".act-note").onclick = () => openNote(i);
   el.querySelector(".act-del").onclick = async () => {
-    // 確かめの画面は出さず、消したあと8秒だけ「元に戻す」を出す。続けて消したら、まとめて戻せる
+    // はい・いいえ で確かめてから消す。消したあと8秒だけ「元に戻す」も出す。続けて消したら、まとめて戻せる
+    const short = (i.title || "").length > 20 ? i.title.slice(0, 19) + "…" : (i.title || "これ");
+    if (!await askYesNo("削除してよろしいですか?", `「${short}」`)) return;
     await api(`/api/items/${i.id}`, { method: "DELETE" });
     undoItems.push(i);
     await load();
@@ -1128,7 +1147,7 @@ function openBoxMenu(bid) {
     load();
   });
   btn("🗑 箱を削除<span class=\"hint\">中のフォルダ・お店は消えません</span>", async () => {
-    if (!confirm(`箱「${name}」を削除しますか?\n中のフォルダやお店は消えずに、箱の外(「すべて」)に戻ります。`)) return;
+    if (!await askYesNo(`箱「${name}」を削除してよろしいですか?`, "中のフォルダやお店は消えずに、箱の外(「すべて」)に戻ります。")) return;
     await api(`/api/boxes/${bid}`, { method: "DELETE" });
     if (history.state && history.state.box != null) history.back(); else leaveBox();
     await load();
@@ -1298,7 +1317,8 @@ function renderMemos() {
     if (m.note) { const sub = li.querySelector(".memo-sub"); sub.textContent = m.note; sub.hidden = false; }
     li.querySelector(".memo-date span:last-child").textContent = fmtDate(m.created_at);
     li.querySelector(".memo-del").onclick = async () => {
-      // お店と同じく、確かめの画面は出さず、8秒だけ「元に戻す」を出す
+      // お店と同じく、はい・いいえ で確かめてから消す(8秒だけ「元に戻す」も出す)
+      if (!await askYesNo("このメモを削除してよろしいですか?")) return;
       await api(`/api/items/${m.id}`, { method: "DELETE" });
       undoItems.push(m);
       await load();
@@ -1536,7 +1556,7 @@ $("#importFile").onchange = async (e) => {
   let data;
   try { data = JSON.parse(await f.text()); } catch (err) { toast("ファイルを読めませんでした"); return; }
   const n = Array.isArray(data.items) ? data.items.length : 0;
-  if (!confirm(`このファイルの${n}件で、今のデータ(${items.length + memos.length}件)を置き換えますか?\n今のデータは消えます。`)) return;
+  if (!await askYesNo(`このファイルの${n}件で、今のデータ(${items.length + memos.length}件)を置き換えてよろしいですか?`, "今のデータは消えます。")) return;
   try {
     const r = LocalAPI.importData(data);
     await LocalAPI.saveState();
