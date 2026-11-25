@@ -401,6 +401,8 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 .set-note { font-size: 12px; color: var(--muted); margin: 12px 0 0; line-height: 1.6; }
 .set-btn { display: block; width: 100%; text-align: center; padding: 11px; margin-bottom: 8px; border: none; border-radius: 16px;
   background: var(--bg); color: var(--text); font-size: 14px; text-decoration: none; }
+.set-btn { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+.set-btn small { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--muted); }
 .bg-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .bg-swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: none; background: none; font-size: 11px; color: var(--soft); }
 .bg-swatch span { width: 46px; height: 46px; border-radius: 23px; box-shadow: 0 0 0 1px var(--line); }

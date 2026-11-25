@@ -1534,8 +1534,8 @@ $("#importFile").onchange = async (e) => {
 };
 
 $("#settingsBtn").onclick = () => {
-  $("#folderSetBtn").textContent = folders.length ? "📁 フォルダの管理(作る・並べ替え・振り分け)" : "📁 フォルダを作る";
-  $("#boxSetBtn").textContent = boxes.length ? `📦 箱を作る(今 ${boxes.length}個)` : "📦 箱を作る(食事・サイト・旅行…のまとまり)";
+  $("#folderSetBtn").innerHTML = folders.length ? "📁 フォルダの管理<small>作る・並べ替え・振り分け</small>" : "📁 フォルダを作る";
+  $("#boxSetBtn").innerHTML = boxes.length ? `📦 箱を作る<small>今 ${boxes.length}個</small>` : "📦 箱を作る<small>食事・サイト・旅行…のまとまり</small>";
   renderSettings(); $("#settingsDlg").showModal();
 };
 $("#boxSetBtn").onclick = async () => { $("#settingsDlg").close(); await createBox(); };
