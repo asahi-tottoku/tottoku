@@ -1403,6 +1403,7 @@ const ACCENTS = [
 ];
 
 const BGS = [["fuwa", "ふんわり"], ["sakura", "さくら"], ["sora", "そら"], ["mint", "ミント"], ["shiro", "しろ"]];
+const CARD_COLORS = [["white", "しろ"], ["cream", "クリーム"], ["sakura", "さくら"], ["sora", "そら"], ["mint", "ミント"], ["lavender", "ふじ"]];
 const SHAPES = [["float", "浮かぶ", "少し傾いて浮く"], ["stack", "重なる", "うしろに2枚"], ["seal", "シール", "箱ごとに色を塗る"], ["plain", "すっきり", "線だけ・傾けない"]];
 
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -1417,6 +1418,7 @@ function applyLook(look) {
   root.dataset.accent = look.accent || "ai";
   root.dataset.bg = look.bg || "fuwa";
   root.dataset.card = look.card || "float";
+  root.dataset.cardbg = look.cardbg || "white";
   if (look.theme && look.theme !== "auto") root.dataset.theme = look.theme;
   else delete root.dataset.theme;
   // 暗い表示か(「自動」なら端末の設定)。CSS は data-dark を見る
@@ -1463,6 +1465,18 @@ function renderSettings() {
     b.setAttribute("aria-pressed", String((look.bg || "fuwa") === key));
     b.onclick = () => saveLook({ bg: key });
     bgBox.appendChild(b);
+  });
+  const ccBox = $("#cardColors");
+  ccBox.innerHTML = "";
+  CARD_COLORS.forEach(([key, label]) => {
+    const on = (look.cardbg || "white") === key;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bg-swatch cc-" + key + (on ? " on" : "");
+    b.innerHTML = `<span aria-hidden="true"></span>${label}`;
+    b.setAttribute("aria-pressed", String(on));
+    b.onclick = () => saveLook({ cardbg: key });
+    ccBox.appendChild(b);
   });
   const shapeBox = $("#cardShapes");
   shapeBox.innerHTML = "";

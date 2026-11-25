@@ -15,10 +15,10 @@
   try {
     const s = JSON.parse(localStorage.getItem("tottoku-look") || "{}");
     const d = document.documentElement.dataset;
-    d.accent = s.accent || "ai"; d.bg = s.bg || "fuwa"; d.card = s.card || "float";
+    d.accent = s.accent || "ai"; d.bg = s.bg || "fuwa"; d.card = s.card || "float"; d.cardbg = s.cardbg || "white";
     if (s.theme && s.theme !== "auto") d.theme = s.theme;
     if (s.theme === "dark" || (s.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)) d.dark = "";
-  } catch (e) { Object.assign(document.documentElement.dataset, { accent: "ai", bg: "fuwa", card: "float" }); }
+  } catch (e) { Object.assign(document.documentElement.dataset, { accent: "ai", bg: "fuwa", card: "float", cardbg: "white" }); }
 </script>
 <!-- 字の形(丸ゴシックと数字用の等幅)。読めないとき(電波が無いなど)は、端末の字で出る -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -150,6 +150,8 @@
   <div id="bgSwatches" class="bg-swatches"></div>
   <p class="set-label">カードの形</p>
   <div id="cardShapes" class="card-shapes"></div>
+  <p class="set-label">カードの色(お店のカード)</p>
+  <div id="cardColors" class="bg-swatches card-colors"></div>
   <p class="set-label">差し色(ボタンの色)</p>
   <div id="swatches" class="swatches"></div>
   <p class="set-label">画面の明るさ</p>
@@ -158,7 +160,7 @@
     <button data-theme="light">ライト</button>
     <button data-theme="dark">ダーク</button>
   </div>
-  <p class="set-note">背景とカードの形は、最初の画面と箱の中の両方に効きます。「自動」はスマホやパソコンの設定に合わせます。見た目の設定は、この端末にだけ保存されます。</p>
+  <p class="set-note">背景・カードの色・カードの形は、最初の画面と箱の中の両方に効きます。「自動」はスマホやパソコンの設定に合わせます。見た目の設定は、この端末にだけ保存されます。</p>
   <p class="set-label">箱とフォルダ</p>
   <button id="boxSetBtn" class="set-btn">📦 箱を作る</button>
   <button id="folderSetBtn" class="set-btn">📁 フォルダを作る</button>

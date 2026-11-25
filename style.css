@@ -17,6 +17,7 @@
   /* 種類ごとの色(カードの絵の代わり) */
   --k0: #ffe3d6; --ki0: #8a3a12; --k1: #d8f3e3; --ki1: #17603c; --k2: #dbe5ff; --ki2: #2740b8;
   --k3: #fff0c7; --ki3: #7a5200; --k4: #eceefa; --ki4: #3a3f6b;
+  --field-line: #b4b9dc; --card-bg: var(--surface);
   --memo-badge: #e8437f; --memo-badge-ink: #ffffff; --danger: #c92a2a;
   --round: "Zen Maru Gothic", system-ui, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
   --mono: "DM Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -42,6 +43,7 @@
   --t4: #3d2a66; --i4: #e0d0ff; --g4: rgba(170,130,255,.30);
   --k0: #4a2a1c; --ki0: #ffc9ad; --k1: #1d4a3a; --ki1: #b9f0d2; --k2: #2a3a8c; --ki2: #cdd8ff;
   --k3: #4d3d10; --ki3: #ffe6a3; --k4: #2b3062; --ki4: #d6d9f7;
+  --field-line: #5a609c;
   --memo-badge: #ff8fb6; --memo-badge-ink: #3a0d22; --danger: #ff8787;
   color-scheme: dark;
 }
@@ -50,6 +52,18 @@
 :root[data-dark][data-bg="sora"]   { --bg: #0f1626; --bg-img: radial-gradient(70% 45% at 0% 0%, #1d3a6b 0%, rgba(29,58,107,0) 70%), radial-gradient(60% 40% at 100% 70%, #12445a 0%, rgba(18,68,90,0) 70%); }
 :root[data-dark][data-bg="mint"]   { --bg: #0f1c17; --bg-img: radial-gradient(70% 45% at 0% 0%, #17443c 0%, rgba(23,68,60,0) 70%), radial-gradient(60% 40% at 100% 60%, #3d3a14 0%, rgba(61,58,20,0) 70%); }
 :root[data-dark][data-bg="shiro"]  { --bg: #141519; --bg-img: none; }
+
+/* お店のカードの色(data-cardbg)。「しろ」は今までどおり(暗い表示では紺) */
+:root[data-cardbg="cream"]    { --card-bg: #fff3d6; }
+:root[data-cardbg="sakura"]   { --card-bg: #ffe6ef; }
+:root[data-cardbg="sora"]     { --card-bg: #e3eeff; }
+:root[data-cardbg="mint"]     { --card-bg: #e0f5ea; }
+:root[data-cardbg="lavender"] { --card-bg: #ece6ff; }
+:root[data-dark][data-cardbg="cream"]    { --card-bg: #3a3322; }
+:root[data-dark][data-cardbg="sakura"]   { --card-bg: #45263a; }
+:root[data-dark][data-cardbg="sora"]     { --card-bg: #1f3358; }
+:root[data-dark][data-cardbg="mint"]     { --card-bg: #1d3d34; }
+:root[data-dark][data-cardbg="lavender"] { --card-bg: #322a5a; }
 
 /* 差し色(明るい画面用 / 暗い画面用) */
 :root[data-accent="ai"]     { --a-light: #3d5bf5; --a-dark: #8fa2ff; }
@@ -108,7 +122,7 @@ main { max-width: 760px; margin: 0 auto; padding: 6px 20px 90px; }
 
 /* ---------- 保存と検索の欄(丸い帯) ---------- */
 .pill { display: flex; align-items: center; gap: 6px; height: 52px; border-radius: 26px; }
-form.add { background: var(--surface); padding: 0 6px 0 20px; margin: 0 0 12px; box-shadow: 0 10px 28px -10px var(--glow-base); }
+form.add { background: var(--surface); border: 1.5px solid var(--field-line); padding: 0 6px 0 20px; margin: 0 0 12px; box-shadow: 0 10px 28px -10px var(--glow-base); }
 form.add input { flex: 1; height: 100%; border: none; background: none; padding: 0; font-size: 15px; }
 form.add input:focus { outline: none; }
 form.add:focus-within { box-shadow: 0 0 0 2px var(--accent), 0 10px 28px -10px var(--glow-base); }
@@ -116,7 +130,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .paste-btn { flex: none; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: none; border-radius: 20px;
   background: var(--chip); color: var(--soft); }
 .search { margin: 0; }
-.search-row.soft { background: var(--glass); border: 1px solid var(--glass-line); padding: 0 6px 0 18px; gap: 10px; }
+.search-row.soft { background: var(--surface); border: 1.5px solid var(--field-line); padding: 0 6px 0 18px; gap: 10px; }
 .search-row:focus-within { box-shadow: 0 0 0 2px var(--accent); }
 .search-ic { flex: none; color: var(--muted); }
 .search-row input { flex: 1; height: 100%; border: none; background: none; padding: 0; font-size: 15px; }
@@ -132,7 +146,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .filter-note .link { background: none; border: none; color: var(--accent); padding: 4px 6px; font-size: 14px; text-decoration: underline; }
 .web-links { flex-basis: 100%; display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .web-links span { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.web-links a { flex: 1 1 0; min-width: 0; text-align: center; padding: 8px 4px; border-radius: 16px; background: var(--glass);
+.web-links a { flex: 1 1 0; min-width: 0; text-align: center; padding: 8px 4px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--field-line);
   color: var(--accent); font-weight: 700; font-size: 13px; text-decoration: none; }
 .web-links.big { margin-top: 0; }
 .web-links.big a { padding: 11px 4px; font-size: 15px; }
@@ -237,7 +251,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 
 /* ---------- お店のカード ---------- */
 .list { list-style: none; margin: 0; padding: 2px 0 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.card { display: flex; gap: 10px; padding: 12px 12px 2px; border-radius: 22px; background: var(--surface);
+.card { display: flex; gap: 10px; padding: 12px 12px 2px; border-radius: 22px; background: var(--card-bg);
   box-shadow: 0 20px 34px -18px var(--glow-base), var(--shade); }
 .card.processing { opacity: .7; }
 .thumb { flex: none; width: 64px; height: 64px; border-radius: 16px; overflow: hidden; display: block; background: var(--k); color: var(--ki); }
@@ -325,7 +339,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 :root[data-card="seal"] .memo-card.m-1 { background: var(--t0); }
 :root[data-card="seal"] .memo-card.m-2 { background: var(--t2); }
 :root[data-card="seal"] .memo-card.m-3 { background: var(--t3); }
-:root[data-card="seal"] .card { border: 4px solid var(--surface); background: color-mix(in srgb, var(--surface) 70%, var(--chip)); box-shadow: 0 6px 16px -8px rgba(40,50,110,.25); }
+:root[data-card="seal"] .card { border: 4px solid var(--surface); background: color-mix(in srgb, var(--card-bg) 70%, var(--chip)); box-shadow: 0 6px 16px -8px rgba(40,50,110,.25); }
 /* すっきり: 細い線だけ。傾けない・影なし。件数は「42 件」 */
 :root[data-card="plain"] .box-card, :root[data-card="plain"] .card, :root[data-card="plain"] .memo-card {
   border: 1px solid var(--line); border-radius: 18px; box-shadow: none; }
@@ -415,6 +429,10 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 .bg-sora span { background: linear-gradient(135deg, #d6ecff, #eef6ff); }
 .bg-mint span { background: linear-gradient(135deg, #d4f3e4, #f1fbf6); }
 .bg-shiro span { background: #fafafc; }
+.card-colors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.card-colors .bg-swatch span { width: 38px; height: 38px; border-radius: 19px; }
+.cc-cream span { background: #fff3d6; } .cc-sakura span { background: #ffe6ef; } .cc-sora span { background: #e3eeff; }
+.cc-mint span { background: #e0f5ea; } .cc-lavender span { background: #ece6ff; } .cc-white span { background: #ffffff; }
 .card-shapes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .shape { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 56px; padding: 10px 14px; text-align: left;
   border: 2px solid transparent; border-radius: 18px; background: var(--bg); white-space: normal; }
