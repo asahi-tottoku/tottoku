@@ -304,7 +304,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .box-empty { margin: 18px 4px; font-size: 14px; color: var(--muted); }
 
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30;
-  background: var(--text); color: var(--bg); padding: 11px 20px; border-radius: 999px; font-size: 14px; font-weight: 700;
+  background: var(--accent); color: var(--on-accent); padding: 11px 20px; border-radius: 999px; font-size: 14px; font-weight: 700;
   box-shadow: 0 10px 30px rgba(20,24,60,.3); width: max-content; max-width: calc(100% - 32px); overflow-wrap: anywhere; }
 .toast button { margin-left: 12px; padding: 0 2px; font: inherit; font-weight: 900; color: inherit; background: none; border: none; text-decoration: underline; }
 
