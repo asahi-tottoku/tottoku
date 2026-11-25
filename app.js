@@ -867,7 +867,7 @@ function card(i) {
     th.querySelector("img").src = i.image;
     th.querySelector("img").onerror = noimg;
   } else noimg();
-  el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : i.category;
+  el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : "";   // 種類(その他・飲食店…)は左の四角と重なるので出さない
   const d = distKm(i);
   el.querySelector(".dist").textContent = d != null ? "📍" + fmtKm(d) : "";
   el.querySelector(".date").textContent = fmtDate(i.created_at) + (i.site ? " · " + i.site.replace(/^www\./, "") : "");
@@ -931,6 +931,7 @@ function card(i) {
     };
   }
   el.querySelector(".act-note").onclick = () => openNote(i);
+  el.querySelector(".act-share").onclick = () => shareItem(i);   // 編集の横の共有アイコン
   el.querySelector(".act-del").onclick = async () => {
     // はい・いいえ で確かめてから消す。消したあと8秒だけ「元に戻す」も出す。続けて消したら、まとめて戻せる
     const short = (i.title || "").length > 20 ? i.title.slice(0, 19) + "…" : (i.title || "これ");
