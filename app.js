@@ -1023,21 +1023,25 @@ function renderBoxes() {
   grid.classList.toggle("moving", moveMode);
   $("#moveBar").hidden = !moveMode;
   $("#boxStat").textContent = `${boxes.length} はこ / ${items.length} 件`;
-  const cards = [{ key: "all", name: "すべて", list: items }, ...boxes.map((b) => ({ key: b.id, name: b.name, list: items.filter((i) => boxOf(i) === b.id) }))];
+  // 2枚目は決まった「メモ」の箱(押すとメモの画面)。動かせない・消せない
+  const cards = [{ key: "all", name: "すべて", list: items }, { key: "memo", name: "メモ", list: memos }, ...boxes.map((b) => ({ key: b.id, name: b.name, list: items.filter((i) => boxOf(i) === b.id) }))];
   cards.forEach((c, n) => {
     const a = document.createElement("button");
     a.type = "button";
-    a.className = `box-card tint-${tintOf(c.key)}` + (c.key === "all" ? "" : " sortable");
+    const fixed = c.key === "all" || c.key === "memo";
+    a.className = `box-card tint-${c.key === "memo" ? 1 : tintOf(c.key)}` + (fixed ? "" : " sortable");
     a.dataset.key = c.key;
     a.innerHTML = `<span class="box-no"></span><span class="box-name"></span><span class="box-sub"></span><span class="box-n"></span>`;
     a.querySelector(".box-no").textContent = `${pad2(n + 1)} / ${pad2(cards.length)}`;
     a.querySelector(".box-name").textContent = c.name;
     // 説明: 「すべて」は決まった文、ほかは新しいもの2つの名前
-    a.querySelector(".box-sub").textContent = c.key === "all" ? "箱の外のものも全部" : c.list.slice(0, 2).map((i) => shortName(i.title || i.site)).join("、") || "まだ空です";
+    a.querySelector(".box-sub").textContent = c.key === "all" ? "箱の外のものも全部"
+      : c.key === "memo" ? (c.list.slice(0, 2).map((m) => shortName(m.shared_text || m.url || m.title || "")).join("、") || "思いついたことを書く")
+      : c.list.slice(0, 2).map((i) => shortName(i.title || i.site)).join("、") || "まだ空です";
     a.querySelector(".box-n").textContent = c.list.length;
     a.setAttribute("aria-label", `${c.name}(${c.list.length}件)`);
-    a.onclick = () => { if (!moveMode) enterBox(c.key); };
-    if (c.key !== "all") {
+    a.onclick = () => { if (moveMode) return; if (c.key === "memo") $("#memoBtn").click(); else enterBox(c.key); };
+    if (!fixed) {
       attachSort(a, { sel: ".box-card.sortable", axis: "xy", instant: () => moveMode,
         onLift: () => { if (!moveMode) { moveMode = true; grid.classList.add("moving"); $("#moveBar").hidden = false; } },
         onDone: saveBoxOrder });
