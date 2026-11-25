@@ -859,10 +859,16 @@ function card(i) {
   if (i.status === "processing") el.classList.add("processing");
   const th = el.querySelector(".thumb");
   th.href = link;
-  // 絵が無いときは、ジャンル(焼肉・スイーツ…)か種類(動画・買い物…)の文字を、種類ごとの淡い色の上に出す
+  // 絵が無いときは、箱の名前(2026-11-25 きよさん。ジャンルはフォルダの札で分かるので)を、種類ごとの淡い色の上に出す。
+  // 箱に入っていなければ、今までどおりジャンル(焼肉・スイーツ…)か種類(動画・買い物…)
   const g = genreOf(i);
+  const bname = boxOf(i) != null ? boxName(boxOf(i)) : "";
   th.classList.add("k-" + (KIND_TINT[i.category] ?? 4));
-  const noimg = () => { th.classList.add("noimg"); th.textContent = g !== "その他" ? (GENRE_LABEL[g] || g).split("・")[0] : i.category; };
+  const noimg = () => {
+    th.classList.add("noimg");
+    th.textContent = bname || (g !== "その他" ? (GENRE_LABEL[g] || g).split("・")[0] : i.category);
+    if (th.textContent.length > 6) th.classList.add("long");
+  };
   if (i.image) {
     th.querySelector("img").src = i.image;
     th.querySelector("img").onerror = noimg;
@@ -870,7 +876,10 @@ function card(i) {
   el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : "";   // 種類(その他・飲食店…)は左の四角と重なるので出さない
   const d = distKm(i);
   el.querySelector(".dist").textContent = d != null ? "📍" + fmtKm(d) : "";
-  el.querySelector(".date").textContent = fmtDate(i.created_at) + (i.site ? " · " + i.site.replace(/^www\./, "") : "");
+  // 保存した日時は出さない(2026-11-25 きよさん「いらない」。並びの「新しい順」は今までどおり)。サイト名だけ残す
+  el.querySelector(".date").textContent = i.site ? i.site.replace(/^www\./, "") : "";
+  const meta = el.querySelector(".meta");
+  if (![...meta.children].some((s) => s.textContent)) meta.remove();
   const t = el.querySelector(".title");
   t.textContent = i.title || i.url; t.href = link;
   el.querySelector(".summary").textContent = i.summary || "";
@@ -1464,9 +1473,10 @@ function applyLook(look) {
   // 暗い表示か(「自動」なら端末の設定)。CSS は data-dark を見る
   const dark = look.theme === "dark" || (look.theme !== "light" && darkMQ.matches);
   if (dark) root.dataset.dark = ""; else delete root.dataset.dark;
-  // スマホの上の帯(ステータスバー)の色も合わせる
+  // スマホの帯の色を、ボタンの色(差し色)に合わせる(2026-11-25 きよさん「下の帯はボタンの色と同じ色に」)。
+  // ホーム画面に置いたアプリの下の帯は、端末・Chrome によっては manifest の theme_color(既定の差し色)のままのことがある
   requestAnimationFrame(() => {
-    const c = getComputedStyle(root).getPropertyValue("--bg").trim();
+    const c = getComputedStyle(root).getPropertyValue("--accent").trim();
     document.querySelector('meta[name="theme-color"]').setAttribute("content", c);
   });
 }
