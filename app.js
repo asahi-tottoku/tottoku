@@ -494,6 +494,8 @@ function openNote(item) {
     b.onclick = () => { $("#whoInput").value = n; };
     box.appendChild(b);
   });
+  // 送る: 編集の画面の中から(カードの「送る」はここにまとめた)
+  $("#noteShare").onclick = () => { dlg.close(); shareItem(item); };
   $("#noteSave").onclick = async () => {
     await api(`/api/items/${item.id}`, { method: "PATCH",
       body: { title: $("#titleInput").value.trim() || item.title, area: $("#areaInput").value.trim(),
@@ -891,7 +893,7 @@ function card(i) {
     if (place) at.classList.add("set");
     at.title = "地域を直す";
     at.onclick = () => openArea(i);
-  } else at.remove();   // サイト・動画・買い物には出さない(地域を付けたいときは「名前・メモ」から)
+  } else at.remove();   // サイト・動画・買い物には出さない(地域を付けたいときは「編集」から)
 
   el.querySelector(".who").textContent = i.recommender ? `👤 ${i.recommender}のおすすめ` : "";
 
@@ -920,7 +922,6 @@ function card(i) {
     const site = new URL(i.reserve_url).hostname;
     rsv.title = "予約ページを開く(" + site + ")";
   }
-  el.querySelector(".act-share").onclick = () => shareItem(i);
   const mapBtn = el.querySelector(".act-map");
   if (i.category === "飲食店" || i.category === "お出かけ" || i.lat) {
     mapBtn.hidden = false;

@@ -225,7 +225,7 @@
 </dialog>
 
 <dialog id="noteDlg" class="sheet">
-  <p class="sheet-title">名前・メモ・教えてくれた人</p>
+  <p class="sheet-title">編集</p>
   <p id="noteName" class="sheet-sub"></p>
   <label class="set-label" for="titleInput">名前</label>
   <input id="titleInput" type="text" class="field" placeholder="例:炭火焼肉 するが" autocomplete="off">
@@ -237,6 +237,7 @@
   <label class="set-label" for="noteInput">メモ</label>
   <textarea id="noteInput" class="field" rows="3" placeholder="例:予約必須、誕生日に"></textarea>
   <button id="noteSave" class="sheet-ok">保存</button>
+  <button id="noteShare" class="sheet-share" type="button">📤 送る(LINE・メールなど)</button>
   <button id="noteCancel" class="sheet-cancel">閉じる</button>
 </dialog>
 
@@ -254,8 +255,7 @@
       <div class="actions">
         <a class="act-reserve" target="_blank" rel="noopener" hidden>📅 予約</a>
         <button class="act-map" hidden>地図</button>
-        <button class="act-share">送る</button>
-        <button class="act-note">名前・メモ</button>
+        <button class="act-note">編集</button>
         <button class="act-del">削除</button>
       </div>
     </div>

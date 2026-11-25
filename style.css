@@ -392,6 +392,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .sheet-list button.danger { color: var(--danger); }
 .sheet-new { width: 100%; margin-top: 10px; color: var(--accent); border: 2px dashed color-mix(in srgb, var(--accent) 40%, var(--line)); background: none; border-radius: 16px; }
 .sheet-cancel { width: 100%; margin-top: 8px; color: var(--muted); border: none; background: var(--chip); border-radius: 16px; min-height: 44px; }
+.sheet-share { width: 100%; margin-top: 8px; color: var(--accent); background: none; border: 1.5px solid var(--field-line); border-radius: 16px; min-height: 44px; font-weight: 700; }
 .sheet-ok { width: 100%; margin-top: 14px; background: var(--accent); color: var(--on-accent); border: none; border-radius: 16px; min-height: 44px; }
 .field { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 textarea.field { resize: vertical; }
