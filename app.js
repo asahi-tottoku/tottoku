@@ -569,9 +569,12 @@ function openNote(item) {
   // フォルダを選ぶ画面へ。ここまでに書いた名前・地域・メモは先に保存し、一覧も読み直す
   // (読み直さないと、フォルダの画面を閉じたとき古い名前のまま。自動のフォルダが変わることもある)
   $("#noteFolder").onclick = async () => {
-    await api(`/api/items/${item.id}`, { method: "PATCH", body: edits() });
+    const e = edits();
+    await api(`/api/items/${item.id}`, { method: "PATCH", body: e });
     dlg.close();
     await load();
+    // 箱を変えていたら、ここで移っている。フォルダを選ばずに閉じても見失わないよう、先に知らせる(確かめ役の指摘)
+    if ("box" in e) toast(movedMsg(e.box));
     openMove(items.find((x) => x.id === item.id) || { ...item, ...edits() });
   };
   // 送る: 編集の画面の中から(カードの「送る」はここにまとめた)
