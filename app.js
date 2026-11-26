@@ -908,11 +908,24 @@ function card(i) {
   // 色: 箱に入っていれば箱のカードと同じ色(種類ごとだと同じ箱の中で色がばらばらになるため)。箱の外は種類ごとの色
   if (bname) th.classList.add("bt", "tint-" + tintOf(boxOf(i)));
   else th.classList.add("k-" + (KIND_TINT[i.category] ?? 4));
-  // 箱の中では、箱の名前は上の帯と同じなので、ジャンル(スイーツ・ラーメン…)を出す(2026-11-26 デザインチェック)
+  // 左の四角の名前: フォルダに入っていればフォルダの名前(2026-11-26 きよさん「ショップに入れても写真に『その他』と出る。
+  // フォルダ名が写真に入れば、下のフォルダの札はいらない」)。フォルダが無ければ、箱の名前(箱の中では出さない)→ ジャンル → 種類
+  const fname0 = folderName(i.folder_id) || "";
   const glabel = g !== "その他" ? (GENRE_LABEL[g] || g).split("・")[0] : i.category;
+  const label = fname0 || (inBoxView() ? "" : bname) || glabel;
+  const addCap = () => {
+    th.classList.add("genre-pic");
+    const cap = document.createElement("span");
+    cap.className = "thumb-cap";
+    cap.textContent = label;
+    const n = [...label].length;
+    if (n >= 5) cap.classList.add("long");
+    if (n >= 8) cap.classList.add("xlong");
+    th.appendChild(cap);
+  };
   const noimg = () => {
     th.classList.add("noimg");
-    th.textContent = (inBoxView() ? "" : bname) || glabel;
+    th.textContent = label;
     if (th.textContent.length > 6) th.classList.add("long");
   };
   // ジャンルの写真が無ければ、入っている箱の絵(ゴルフ場・旅行など)
@@ -920,22 +933,18 @@ function card(i) {
   const bart0 = bname ? boxArtOf(boxOf(i), bname) : "";
   const bart = ["food", "sweets", "yakiniku", "yoshoku", "italian"].includes(bart0) ? "" : bart0;
   const gart = GENRE_ART[g] ? `genre-art/${GENRE_ART[g]}` : bart ? `box-art/${bart}` : "";
-  // ジャンルが分かれば、ジャンルの写真(きよさんが作った絵)。下に小さく、今まで四角に出していた名前を重ねる(2026-11-26)
+  // ジャンルが分かれば、ジャンルの写真(きよさんが作った絵)。下に小さく名前を重ねる(2026-11-26)
   const showArt = () => {
-    th.classList.add("genre-pic");
     const img = th.querySelector("img");
-    img.onerror = () => { th.classList.remove("genre-pic"); noimg(); };
+    img.onerror = () => { th.classList.remove("genre-pic"); th.querySelector(".thumb-cap")?.remove(); noimg(); };
     img.src = `${gart}.webp`;
-    const cap = document.createElement("span");
-    cap.className = "thumb-cap";
-    cap.textContent = (inBoxView() ? "" : bname) || glabel;
-    if ([...cap.textContent].length >= 5) cap.classList.add("long");
-    th.appendChild(cap);
+    if (!th.querySelector(".thumb-cap")) addCap();
   };
   if (i.image) {
     // お店の写真が読めないときは、ジャンルの写真に(無ければ字)(2026-11-26 点検の残り)
-    th.querySelector("img").onerror = gart ? showArt : noimg;
+    th.querySelector("img").onerror = gart ? showArt : () => { th.querySelector(".thumb-cap")?.remove(); th.classList.remove("genre-pic"); noimg(); };
     th.querySelector("img").src = i.image;
+    if (fname0) addCap();   // お店の写真にも、フォルダの名前を重ねる(下の札を出さないので)
   } else if (gart) showArt();
   else noimg();
   el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : "";   // 種類(その他・飲食店…)は左の四角と重なるので出さない
@@ -951,7 +960,8 @@ function card(i) {
 
   const ft = el.querySelector(".folder-tag");
   const fname = folderName(i.folder_id);
-  if (folders.length || fname) {
+  // フォルダに入っていれば、名前は左の四角に出すので札は出さない(変えるのは「編集」から)。入っていなければ「フォルダなし ›」
+  if (!fname && folders.length) {
     // フォルダを変えるのは、この表示を押す(カードの「フォルダ」ボタンは 2026-11-11 に外した)
     ft.textContent = (fname ? `${fname}${i.folder_manual ? "" : " ✨"}` : "フォルダなし") + " ›";
     ft.title = fname && !i.folder_manual ? "自動で選んだフォルダ" : "";
