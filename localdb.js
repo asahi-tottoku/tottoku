@@ -44,7 +44,8 @@
         }
       }
       mem.genreSig = sig;
-      if (mem.items.length) await saveState();   // 次の起動で、もう一度見直さないように
+      // 次の起動で、もう一度見直さないように。書けなくても(容量がいっぱいなど)読み込みは止めない(次の保存で一緒に書かれる)
+      if (mem.items.length) await saveState().catch(() => {});
     }
     return mem;
   }

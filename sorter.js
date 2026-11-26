@@ -502,7 +502,7 @@
   function genreSig() {
     if (sigCache) return sigCache;
     const src = JSON.stringify([GENRES, STRICT, KANA_WORDS, MORE_WORDS, URL_GENRES], (k, v) => (v instanceof RegExp ? String(v) : v)) +
-      detectGenres.toString() + hasKanaWord.toString();
+      detectGenres.toString() + hasKanaWord.toString() + fnorm.toString();
     let h = 0;
     for (let n = 0; n < src.length; n++) h = (Math.imul(h, 31) + src.charCodeAt(n)) | 0;
     return (sigCache = src.length + ":" + (h >>> 0).toString(36));

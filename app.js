@@ -1181,7 +1181,7 @@ async function renderMap(list) {
     const html = `<b>${escapeHtml(i.title)}</b><br><small>${escapeHtml(i.area || "")}${d != null ? " · " + fmtKm(d) : ""}</small>` +
       (todayHours(i) ? `<br><small>${escapeHtml(todayHours(i))}</small>` : "") +
       (i.url ? `<br><a href="${escapeHtml(i.url)}" target="_blank" rel="noopener">開く</a>` : "") +
-      (i.reserve_url ? ` · <a href="${escapeHtml(i.reserve_url)}" target="_blank" rel="noopener">予約</a>` : "");
+      (i.reserve_url ? `${i.url ? " · " : "<br>"}<a href="${escapeHtml(i.reserve_url)}" target="_blank" rel="noopener">予約</a>` : "");
     mapLayer.addLayer(L.marker([i.lat, i.lng], { icon }).bindPopup(html));
     pts.push([i.lat, i.lng]);
   });
