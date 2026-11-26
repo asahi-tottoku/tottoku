@@ -884,7 +884,9 @@ function card(i) {
     if (th.textContent.length > 6) th.classList.add("long");
   };
   // ジャンルの写真が無ければ、入っている箱の絵(ゴルフ場・旅行など)
-  const bart = bname ? boxArtOf(boxOf(i), bname) : "";
+  // ただし料理の絵(パスタ・ケーキ…)は、ジャンルの分からない店に出すと別の料理の店に見えるので使わない(2026-11-26)
+  const bart0 = bname ? boxArtOf(boxOf(i), bname) : "";
+  const bart = ["food", "sweets", "yakiniku", "yoshoku", "italian"].includes(bart0) ? "" : bart0;
   const gart = !i.image && (GENRE_ART[g] ? `genre-art/${GENRE_ART[g]}` : bart ? `box-art/${bart}` : "");
   if (i.image) {
     th.querySelector("img").src = i.image;
@@ -898,6 +900,7 @@ function card(i) {
     const cap = document.createElement("span");
     cap.className = "thumb-cap";
     cap.textContent = (inBoxView() ? "" : bname) || glabel;
+    if ([...cap.textContent].length >= 5) cap.classList.add("long");
     th.appendChild(cap);
   } else noimg();
   el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : "";   // 種類(その他・飲食店…)は左の四角と重なるので出さない
@@ -1136,6 +1139,8 @@ function renderBoxes() {
       `<span class="box-title">${boxIconSvg(art)}<span class="box-name"></span></span><span class="box-sub"></span><span class="box-n"></span>`;
     if (art) a.classList.add("has-art");
     a.querySelector(".box-name").textContent = c.name;
+    // 5文字以上の名前は、字を少し小さくして2行まで(2026-11-26 デザインチェック「行きた…」)
+    if ([...c.name].length >= 5) a.classList.add("long-name");
     // 説明: 「すべて」は決まった文、ほかは新しいもの2つの名前
     a.querySelector(".box-sub").textContent = c.key === "all" ? "箱の外のものも全部"
       : c.key === "memo" ? (c.list.slice(0, 2).map((m) => shortName(m.shared_text || m.url || m.title || "")).join("、") || "思いついたことを書く")

@@ -199,6 +199,10 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .box-title { display: flex; align-items: center; gap: 6px; max-width: 100%; padding-right: 34px; position: relative; z-index: 1; }
 .box-title .box-name { margin-top: 0; font-size: 17px; min-width: 0; }
 .box-card.has-art, .box-card { padding: 14px 12px; }
+.box-card.long-name .box-title { align-items: flex-start; }
+.box-card.long-name .box-name { font-size: 15px; line-height: 1.25; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.box-card.long-name .box-sub { -webkit-line-clamp: 1; margin-top: 6px; }
+#noteDlg .sheet-title:focus { outline: none; }
 .box-ico { flex: none; width: 22px; height: 22px; color: var(--ink); }
 .box-card .box-sub { position: relative; z-index: 1; margin-top: 8px; padding-right: 0; color: var(--soft); }
 .box-card.has-art .box-sub { max-width: 64%; }
@@ -207,7 +211,9 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
   border-bottom-right-radius: 28px;
   -webkit-mask-image: radial-gradient(130% 120% at 100% 100%, #000 45%, transparent 75%);
   mask-image: radial-gradient(130% 120% at 100% 100%, #000 45%, transparent 75%); }
-:root[data-dark] .box-art { opacity: .85; }
+/* 暗い表示: 薄くすると濁るので、絵はそのまま。ぼかしの幅を狭くして、絵をはっきり見せる */
+:root[data-dark] .box-art { -webkit-mask-image: radial-gradient(130% 120% at 100% 100%, #000 58%, transparent 80%);
+  mask-image: radial-gradient(130% 120% at 100% 100%, #000 58%, transparent 80%); }
 :root[data-card="seal"] .box-art { border-bottom-right-radius: 24px; }
 :root[data-card="seal"] .box-ico { color: var(--ink); }
 :root[data-card="seal"] .box-title, :root[data-card="plain"] .box-title { padding-right: 0; }   /* 件数は下に出るので右をあけない */
@@ -277,8 +283,9 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .thumb.bt { --k: var(--tint); --ki: var(--ink); }   /* 箱に入っているお店は、箱のカードと同じ色 */
 /* ジャンルの写真の上に、名前を小さく重ねる */
 .thumb.genre-pic { position: relative; text-decoration: none; }
-.thumb-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 3px 3px; font-size: 10px; font-weight: 800; line-height: 1.2; color: #fff; text-align: center;
+.thumb-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 3px 4px; font-size: 12px; font-weight: 800; line-height: 1.2; color: #fff; text-align: center;
   background: linear-gradient(transparent, rgba(0,0,0,.62)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.thumb-cap.long { font-size: 10.5px; letter-spacing: -.02em; }
 .body { flex: 1; min-width: 0; }
 .meta { display: flex; gap: 6px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--muted); }
 .dist { color: var(--accent); font-weight: 700; }

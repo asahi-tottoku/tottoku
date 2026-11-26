@@ -142,6 +142,11 @@
 
 <dialog id="settingsDlg" class="sheet">
   <p class="sheet-title">設定</p>
+  <p class="set-label">データ(バックアップ)</p>
+  <button id="exportBtn" class="set-btn">⬇ 全部を書き出す<small>バックアップ用のファイル</small></button>
+  <button id="importBtn" class="set-btn caution">⬆ ファイルから読み込む<small>今のデータと置き換えます</small></button>
+  <input id="importFile" type="file" accept=".json,application/json" hidden>
+  <p id="backupNote" class="set-note"></p>
   <p class="set-label">背景の色</p>
   <div id="bgSwatches" class="bg-swatches"></div>
   <p class="set-label">カードの形</p>
@@ -160,11 +165,6 @@
   <p class="set-label">箱とフォルダ</p>
   <button id="boxSetBtn" class="set-btn">📦 箱を作る</button>
   <button id="folderSetBtn" class="set-btn">📁 フォルダを作る</button>
-  <p class="set-label">データ</p>
-  <button id="exportBtn" class="set-btn">⬇ 全部を書き出す<small>バックアップ用のファイル</small></button>
-  <button id="importBtn" class="set-btn caution">⬆ ファイルから読み込む<small>今のデータと置き換えます</small></button>
-  <input id="importFile" type="file" accept=".json,application/json" hidden>
-  <p id="backupNote" class="set-note"></p>
   <details class="howto-box"><summary>使い方</summary>
   <ol class="howto">
     <li><b>保存する</b>:お店・サイト・動画など、とっておきたいページで「共有」→「コピー」。上の欄に貼り付けて(📋 を押しても貼り付けられます)「保存」を押します。お店は、地名とジャンルでフォルダに自動で入ります。</li>
@@ -221,7 +221,7 @@
 </dialog>
 
 <dialog id="noteDlg" class="sheet">
-  <p class="sheet-title">編集</p>
+  <p class="sheet-title" tabindex="-1" autofocus>編集</p>
   <p id="noteName" class="sheet-sub"></p>
   <label class="set-label" for="titleInput">名前</label>
   <input id="titleInput" type="text" class="field" placeholder="例:炭火焼肉 するが" autocomplete="off">
