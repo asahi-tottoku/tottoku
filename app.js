@@ -109,12 +109,15 @@ function createFolder() {
   $("#newFolderBoxRow").hidden = !boxes.length;
   fillBoxSelect(sel, inBoxView() ? activeBox : boxes.length ? boxes[0].id : null);
   return new Promise((resolve) => {
-    let id = null;
+    let id = null, busy = false;
     const ok = async () => {
       const name = input.value.trim();
       if (!name) { input.focus(); return; }
+      if (busy) return;   // 「作る」を続けて2回押しても1回だけ(2回目が「同じ名前のフォルダがあります」になっていた)
+      busy = true;
       const box_id = boxes.length ? selBox(sel) : null;
       const res = await api("/api/folders", { method: "POST", body: { name, box_id } });
+      busy = false;
       if (res.error) { toast(res.error); return; }
       id = res.id;
       // 今いる箱と違う箱に入れたら、どこに入ったかを知らせる
@@ -544,12 +547,13 @@ function openNote(item) {
   const boxEdit = () => {
     if (!boxes.length) return {};
     const b = selBox(nb);
-    return b === boxOf(item) ? {} : { box: b, ...(folderName(item.folder_id) ? { folder: null } : {}) };
+    // 箱を変えたら、手で選んだ「フォルダなし」にする(自動のままだと、保存したとたん新しい箱のフォルダや、
+    // 「箱に入れない」でもほかの箱のフォルダに自動で入ってしまう。2026-11-26 code-review)
+    return b === boxOf(item) ? {} : { box: b, folder: null };
   };
   nb.onchange = () => {
     const f = folderName(item.folder_id);
-    const fb = (folders.find((x) => x.id === item.folder_id) || {}).box_id ?? null;
-    $("#noteFolder").textContent = f && selBox(nb) !== fb ? "フォルダなし(箱を変えるため)" : `${f || "フォルダなし"}${f && !item.folder_manual ? "(自動)" : ""}`;
+    $("#noteFolder").textContent = selBox(nb) !== boxOf(item) ? "フォルダなし(箱を変えるため)" : `${f || "フォルダなし"}${f && !item.folder_manual ? "(自動)" : ""}`;
   };
   const edits = () => ({ title: $("#titleInput").value.trim() || item.title, area: $("#areaInput").value.trim(),
     note: $("#noteInput").value.trim(), ...(dropWho ? { recommender: "" } : {}), ...boxEdit() });
@@ -1014,7 +1018,7 @@ function card(i) {
   // ジャンルの写真が無ければ、入っている箱の絵(ゴルフ場・旅行など)
   // ただし料理の絵(パスタ・ケーキ…)は、ジャンルの分からない店に出すと別の料理の店に見えるので使わない(2026-11-26)
   const bart0 = bname ? boxArtOf(boxOf(i), bname) : "";
-  const bart = ["food", "sweets", "yakiniku", "yoshoku", "italian"].includes(bart0) ? "" : bart0;
+  const bart = ["food", "sweets", "yakiniku", "yoshoku", "italian"].includes(bart0) || bart0.startsWith("g:") ? "" : bart0;
   const gart = GENRE_ART[g] ? `genre-art/${GENRE_ART[g]}` : bart ? `box-art/${bart}` : "";
   // ジャンルが分かれば、ジャンルの写真(きよさんが作った絵)。下に小さく名前を重ねる(2026-11-26)
   const showArt = () => {
@@ -1247,9 +1251,16 @@ function boxArtOf(key, name) {
   // 地名・会社名の中の言葉では選ばない(「新宿」の宿・「熊本」の本・「ジャパン」のパン など)
   const n = String(name || "").toLowerCase().replace(/ジャパン|japan|パンダ|甘楽|肉付/g, "");
   const hit = BOX_ART.find(([, words]) => words.some((w) => n.includes(w)));
+  // 名前が料理のジャンル(天ぷら・寿司・ラーメン…)なら、そのジャンルの写真(「g:tempura」)。
+  // 焼肉・スイーツ・イタリアン・洋食は箱の絵が先(2026-11-26 きよさん「天ぷらの箱に画像が出ない」)
+  if (!hit || hit[0] === "food") {
+    const g = finestGenre(Sorter.detectGenres(n));
+    if (GENRE_ART[g]) return "g:" + GENRE_ART[g];
+  }
   return hit ? hit[0] : "";
 }
-const boxIconSvg = (art) => `<svg class="box-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BOX_ICON[art] || BOX_ICON.box}</svg>`;
+const artSrc = (art) => (art.startsWith("g:") ? `genre-art/${art.slice(2)}` : `box-art/${art}`) + ".webp";
+const boxIconSvg = (art) => `<svg class="box-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BOX_ICON[art.startsWith("g:") ? "food" : art] || BOX_ICON.box}</svg>`;
 
 function renderBoxes() {
   const grid = $("#boxGrid");
@@ -1270,7 +1281,7 @@ function renderBoxes() {
     a.dataset.key = c.key;
     // 「01 / 05」の番号は意味がないので出さない(2026-11-26 デザインチェック)
     const art = boxArtOf(c.key, c.name);
-    a.innerHTML = (art ? `<img class="box-art" src="box-art/${art}.webp" alt="" loading="lazy" decoding="async">` : "") +
+    a.innerHTML = (art ? `<img class="box-art" src="${artSrc(art)}" alt="" loading="lazy" decoding="async">` : "") +
       `<span class="box-title">${boxIconSvg(art)}<span class="box-name"></span></span><span class="box-sub"></span><span class="box-n"></span>`;
     if (art) a.classList.add("has-art");
     a.querySelector(".box-name").textContent = c.name;
@@ -1634,7 +1645,7 @@ function webLinks(q, big = false) {
 
 // 検索欄: 打つたびに全件を描き直すと、件数が多いとき文字の入力がもたつくので、打ち終わりを少し待ってから(2026-11-26)
 let filterTimer = 0;
-$("#filterInput").oninput = () => { clearTimeout(filterTimer); filterTimer = setTimeout(render, items.length > 150 ? 180 : 0); };
+$("#filterInput").oninput = () => { clearTimeout(filterTimer); filterTimer = setTimeout(() => { filterTimer = 0; render(); }, items.length > 150 ? 180 : 0); };
 $("#filterInput").onkeydown = (e) => {
   if (e.key !== "Enter") return;
   e.preventDefault();
