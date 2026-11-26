@@ -316,12 +316,15 @@
     const latin = t.replace(/[^a-z]+/g, " ");
     const raw = String(text || "").normalize("NFKC");
     const has = (w) => (STRICT[w] ? new RegExp(STRICT[w]).test(raw) : t.includes(fnorm(w)));
-    return Object.entries(GENRES).filter(([name, [words]]) => [...words, name].some(has) ||
+    const found = Object.entries(GENRES).filter(([name, [words]]) => [...words, name].some(has) ||
       (URL_GENRES[name] || []).some((w) => latin.includes(w)) ||
       (name === "バー" && /(^| )bar( |$)/.test(latin)) ||
       (MORE_WORDS[name] || []).some((w) => t.includes(fnorm(w))) ||
       (KANA_WORDS[name] || []).some(([w, bad]) => hasKanaWord(raw, w, bad)))
       .map(([name]) => name);
+    // 「定食」は、ほかのジャンルが何も無いときだけ和食(「海辺の食堂 みなと」に写真を出す。2026-11-26)。
+    // ふつうに数えると「ハンバーグ定食」の洋食屋・「餃子定食」の中華屋まで和食になるため
+    return found.length || !t.includes(fnorm("定食")) ? found : ["和食"];
   }
 
   // かな書きの店名(「すし匠」「そば 田中」)。Web版だけ。PC版と同じ辞書(GENRES)には足さない。
@@ -333,7 +336,6 @@
   };
   // 長めの言葉は、そのまま探す
   const MORE_WORDS = {
-    "和食": ["定食"],   // 「海辺の食堂 みなと」(定食)に写真が出るように(2026-11-26 デザインチェック)
     "天ぷら": ["てんぷら", "天丼"],
     "うなぎ": ["うな重", "うな丼"],
     "焼き鳥": ["焼きとり", "串焼"],

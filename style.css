@@ -424,6 +424,8 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 textarea.field { resize: vertical; }
 /* 編集のメモ: つまみで縮めて見切れないよう、高さは書いた量に合わせる(最低3行) */
 #noteInput { resize: none; min-height: 5.6em; max-height: 40vh; field-sizing: content; }
+.note-who { display: block; margin-top: 8px; padding: 6px 0; border: none; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; }
+.note-who[hidden] { display: none; }
 .note-folder { display: block; text-align: left; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .field:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .sheet label.set-label { display: block; }

@@ -479,21 +479,40 @@ function openMove(item, ask = false) {
 }
 
 // ---------------------------------------------------------------- メモ・教えてくれた人
+// メモ欄の高さを書いた量に合わせる。CSS の field-sizing が使えないブラウザ(Safari・Firefox の一部)だけ JS で
+const FIELD_SIZING = typeof CSS !== "undefined" && CSS.supports && CSS.supports("field-sizing", "content");
+function growNote() {
+  if (FIELD_SIZING) return;
+  const t = $("#noteInput");
+  t.style.height = "auto";
+  t.style.height = t.scrollHeight + 2 + "px";   // 最低・最大の高さは CSS(min-height・max-height)
+}
+$("#noteInput").addEventListener("input", growNote);
 function openNote(item) {
   const dlg = $("#noteDlg");
   $("#noteName").textContent = item.title;
   $("#titleInput").value = item.title || "";
   $("#areaInput").value = item.area || "";
+  $("#noteInput").value = item.note || "";
+  growNote();
   // 「教えてくれた人」の欄は外し、フォルダを変えるボタンにした(2026-11-26 きよさん)。入っていた人の名前はデータに残す
   const fname = folderName(item.folder_id);
   $("#noteFolder").textContent = `📁 ${fname || "フォルダなし"}${fname && !item.folder_manual ? "(自動)" : ""} ▾`;
+  // 前に入れた「教えてくれた人」は、ここで消せる(押すと保存のときに消える)
+  let dropWho = false;
+  const who = $("#noteWho");
+  who.hidden = !item.recommender;
+  who.textContent = `👤 ${item.recommender || ""}のおすすめ を消す`;
+  who.onclick = () => { dropWho = true; who.hidden = true; };
   const edits = () => ({ title: $("#titleInput").value.trim() || item.title, area: $("#areaInput").value.trim(),
-    note: $("#noteInput").value.trim() });
-  // フォルダを選ぶ画面へ。ここまでに書いた名前・地域・メモは先に保存する
+    note: $("#noteInput").value.trim(), ...(dropWho ? { recommender: "" } : {}) });
+  // フォルダを選ぶ画面へ。ここまでに書いた名前・地域・メモは先に保存し、一覧も読み直す
+  // (読み直さないと、フォルダの画面を閉じたとき古い名前のまま。自動のフォルダが変わることもある)
   $("#noteFolder").onclick = async () => {
     await api(`/api/items/${item.id}`, { method: "PATCH", body: edits() });
     dlg.close();
-    openMove({ ...item, ...edits() });
+    await load();
+    openMove(items.find((x) => x.id === item.id) || { ...item, ...edits() });
   };
   // 送る: 編集の画面の中から(カードの「送る」はここにまとめた)
   $("#noteShare").onclick = () => { dlg.close(); shareItem(item); };
@@ -1078,12 +1097,12 @@ const BOX_ART = [
   ["shop", ["ショップ", "買い物", "ショッピング", "通販", "ほしい", "欲しい"]],
   ["site", ["サイト", "web", "ウェブ", "ネット", "リンク", "hp", "ｈｐ", "ホームページ", "url", "ブログ"]],
   ["memo", ["メモ", "ノート"]],
-  ["travel", ["旅行", "旅", "観光", "ホテル", "宿", "温泉", "おでかけ", "お出かけ"]],
+  ["travel", ["旅行", "旅", "観光", "ホテル", "宿泊", "民宿", "旅館", "温泉", "おでかけ", "お出かけ"]],
   ["map", ["地図", "場所", "スポット", "マップ"]],
   ["video", ["動画", "映画", "youtube", "ドラマ", "アニメ"]],
-  ["music", ["音楽", "曲", "ライブ", "歌"]],
+  ["music", ["音楽", "曲", "ライブ", "歌謡", "カラオケ"]],
   ["event", ["イベント", "予定", "行事", "チケット"]],
-  ["docs", ["資料", "本", "読", "勉強", "仕事", "記事"]],
+  ["docs", ["資料", "本屋", "書店", "読", "勉強", "仕事", "記事"]],
   ["fav", ["お気に入り", "好き", "★", "推し"]],
   ["tag", ["タグ"]],
 ];
@@ -1110,7 +1129,8 @@ const BOX_ICON = {
 BOX_ICON.yoshoku = BOX_ICON.food;
 function boxArtOf(key, name) {
   if (key === "all" || key === "memo") return key;
-  const n = String(name || "").toLowerCase();
+  // 地名・会社名の中の言葉では選ばない(「新宿」の宿・「熊本」の本・「ジャパン」のパン など)
+  const n = String(name || "").toLowerCase().replace(/ジャパン|japan|パンダ|甘楽|肉付/g, "");
   const hit = BOX_ART.find(([, words]) => words.some((w) => n.includes(w)));
   return hit ? hit[0] : "";
 }
