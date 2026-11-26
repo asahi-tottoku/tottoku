@@ -968,6 +968,11 @@ function card(i) {
     at.title = "地域を直す";
     at.onclick = () => openArea(i);
   } else at.remove();   // サイト・動画・買い物には出さない(地域を付けたいときは「編集」から)
+  // フォルダと地域の札が両方あるときは、サイト名を出さない(一番下の段を1行に収めるため。2026-11-26)
+  if (el.contains(ft) && el.contains(at)) {
+    const dt = el.querySelector(".date"); if (dt) dt.textContent = "";
+    const m = el.querySelector(".meta"); if (m && ![...m.children].some((s) => s.textContent)) m.remove();
+  }
 
   el.querySelector(".who").textContent = i.recommender ? `👤 ${i.recommender}のおすすめ` : "";
 

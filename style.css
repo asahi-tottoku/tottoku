@@ -289,6 +289,8 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
   background: linear-gradient(transparent, rgba(0,0,0,.62)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 .thumb-cap.long { font-size: 10.5px; letter-spacing: -.02em; }
 .body { flex: 1; min-width: 0; }
+/* 店名などの部分は左の写真(64px)の高さまで取り、一番下の段が写真に重ならないように */
+.body-top { display: flow-root; min-height: 64px; }
 .meta { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .dist { color: var(--accent); font-weight: 700; }
 .tagrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0 2px; }
@@ -315,7 +317,12 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .shopinfo-body pre { margin: 2px 0 0; font: inherit; white-space: pre-wrap; }
 .shopinfo-body a { color: var(--accent); }
 /* ボタンは枠なしの文字。「削除」は右端に灰色 */
-.actions { display: flex; align-items: center; gap: 2px; margin-left: -74px; flex-wrap: wrap; }
+/* カードの一番下の段: 地図・編集・送る の右に、フォルダ(ジャンル)・地域の札とサイト名(2026-11-26 きよさん。店名を読みやすく)。
+   入りきらなければ札だけ次の行へ。左の写真の下まで広げる */
+.card-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; margin-left: -74px; }
+.actions { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.card-foot .tagrow { margin: 0; padding-bottom: 4px; gap: 6px; }
+.card-foot .folder-tag, .card-foot .area-tag { padding: 5px 10px; }
 .actions button, .actions a { display: flex; align-items: center; min-height: 44px; padding: 0 8px; border: none; background: none;
   color: var(--accent); font-size: 13px; font-weight: 700; text-decoration: none; border-radius: 12px; }
 .actions .act-reserve[hidden], .actions .act-map[hidden] { display: none; }
