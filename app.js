@@ -900,8 +900,42 @@ function render() {
   $("#mapBox").hidden = view !== "map";
   ul.hidden = view === "map";
   if (view === "map") renderMap(list);
-  else list.forEach((i) => ul.appendChild(card(i)));
+  else renderCards(ul, list);
   renderSearchNote(list);
+}
+
+// カードは最初に PAGE 枚だけ作り、下までスクロールしたら続きを足す(2026-11-26 重さの点検。前は全件をいっぺんに作っていた)。
+// 同じ絞り込みのまま描き直すとき(編集・保存のあと)は、前に出ていた枚数までは作る(スクロールの位置が飛ばないように)
+const PAGE = 60;
+let shownKey = "", shownN = PAGE, moreObs = null;
+function renderCards(ul, list) {
+  const key = JSON.stringify([activeBox, activeFolder, activeGenre, activeArea, activePref, filterQ(), $("#sortSel").value]);
+  if (key !== shownKey) { shownKey = key; shownN = PAGE; }
+  if (moreObs) { moreObs.disconnect(); moreObs = null; }
+  let n = 0;
+  const more = () => {
+    const end = Math.min(list.length, Math.max(n + PAGE, n === 0 ? shownN : 0));
+    const frag = document.createDocumentFragment();
+    for (; n < end; n++) frag.appendChild(card(list[n]));
+    ul.appendChild(frag);
+    shownN = Math.max(shownN, n);
+    ul.querySelector(".more-sentinel")?.remove();
+    if (n >= list.length) return;
+    // 一番下に「続きを表示」。近づくと自動で足す(自動で足せないときも、押せば出る)
+    const s = document.createElement("li");
+    s.className = "more-sentinel";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = `続きを表示(残り ${list.length - n}件)`;
+    b.onclick = () => { if (moreObs) { moreObs.disconnect(); moreObs = null; } more(); };
+    s.appendChild(b);
+    ul.appendChild(s);
+    if ("IntersectionObserver" in window) {
+      moreObs = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) b.onclick(); }, { rootMargin: "600px 0px" });
+      moreObs.observe(s);
+    }
+  };
+  more();
 }
 
 function renderSearchNote(list) {
@@ -1596,7 +1630,9 @@ function webLinks(q, big = false) {
     <a href="https://tabelog.com/rstLst/?vs=1&sw=${e}" target="_blank" rel="noopener">食べログ</a></div>`;
 }
 
-$("#filterInput").oninput = render;
+// 検索欄: 打つたびに全件を描き直すと、件数が多いとき文字の入力がもたつくので、打ち終わりを少し待ってから(2026-11-26)
+let filterTimer = 0;
+$("#filterInput").oninput = () => { clearTimeout(filterTimer); filterTimer = setTimeout(render, items.length > 150 ? 180 : 0); };
 $("#filterInput").onkeydown = (e) => {
   if (e.key !== "Enter") return;
   e.preventDefault();

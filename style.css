@@ -550,3 +550,7 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 .ask-yes { background: var(--accent); color: var(--on-accent); }
 .ask-yes.danger { background: var(--danger); color: #fff; }
 :root[data-dark] .ask-yes.danger { color: #2a0a0a; }
+
+/* 続きのカードを足すボタン(近づくと自動で足す) */
+.more-sentinel { list-style: none; }
+.more-sentinel button { width: 100%; min-height: 44px; border: 1.5px dashed var(--line); border-radius: 16px; background: none; color: var(--muted); font: inherit; font-size: 14px; }

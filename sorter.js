@@ -361,31 +361,47 @@
     return false;
   }
 
+  // 地名の表の下ごしらえ(正規表現・正規化した名前)。AREAS は読み込みのときに出来上がるので、最初に使うとき1回だけ作る。
+  // 前は文を1つ調べるたびに、全国の市区町村 約1900個ぶんの正規表現を作り直していた(2026-11-26 重さの点検)
+  let placeTable = null, placeTableN = -1;
+  function places() {
+    const n = Object.keys(AREAS).length;
+    if (placeTable && placeTableN === n) return placeTable;
+    placeTableN = n;
+    placeTable = Object.entries(AREAS).map(([key, members]) => {
+      const b = bare(key);
+      return { key, b, nkey: fnorm(key), nb: fnorm(b), re: new RegExp(placePattern(key)),
+        members: members.map((m) => [m, fnorm(m)]),
+        shortOk: b !== key && !(NATIONAL.has(key) && COMMON_WORDS.has(b)) };
+    });
+    return placeTable;
+  }
+
   // 文の中から、辞書にある地名を1つ返す(地域の欄にする)。町の名前を先に、なければ市区町
   function detectPlace(text) {
     let t = fnorm(text);
     if (PREF_RE) t = t.replace(PREF_RE, " ");
     let hit = null;
-    for (const [key, members] of Object.entries(AREAS)) {
-      for (const m of members) {
-        const i = t.indexOf(fnorm(m));
+    const table = places();
+    for (const e of table) {
+      for (const [m, nm] of e.members) {
+        const i = t.indexOf(nm);
         if (i >= 0 && (!hit || i < hit.i || (i === hit.i && m.length > hit.w.length))) hit = { i, w: m };
       }
     }
     if (hit) return hit.w;
     if (!NATIONAL.size) {   // 全国の表が無いとき(PC版と同じ)
-      for (const key of Object.keys(AREAS)) {
-        if (new RegExp(placePattern(key)).test(t) || t.includes(fnorm(bare(key)))) return bare(key);
+      for (const e of table) {
+        if ((t.includes(e.nkey) && e.re.test(t)) || t.includes(e.nb)) return e.b;
       }
       return "";
     }
     // 全国の表があるとき: 文の中でいちばん前に出てくる市区町村(同じ位置なら長い名前)
-    for (const key of Object.keys(AREAS)) {
-      const full = t.search(new RegExp(placePattern(key)));
-      const b = bare(key);
-      const short = b !== key && !(NATIONAL.has(key) && COMMON_WORDS.has(b)) ? t.indexOf(fnorm(b)) : -1;
-      for (const [i, len] of [[full, key.length], [short, b.length]]) {
-        if (i >= 0 && (!hit || i < hit.i || (i === hit.i && len > hit.len))) hit = { i, len, w: b };
+    for (const e of table) {
+      const full = t.includes(e.nkey) ? t.search(e.re) : -1;   // 名前が文に無ければ、正規表現は使わない(速くするため)
+      const short = e.shortOk ? t.indexOf(e.nb) : -1;
+      for (const [i, len] of [[full, e.key.length], [short, e.b.length]]) {
+        if (i >= 0 && (!hit || i < hit.i || (i === hit.i && len > hit.len))) hit = { i, len, w: e.b };
       }
     }
     return hit ? hit.w : "";
@@ -402,8 +418,8 @@
     const w = detectPlace(s);
     if (w) {
       const t = fnorm(w);
-      for (const [key, ms] of Object.entries(AREAS)) {
-        if (fnorm(key) === t || fnorm(bare(key)) === t || ms.some((m) => fnorm(m) === t)) { out = bare(key); break; }
+      for (const e of places()) {
+        if (e.nkey === t || e.nb === t || e.members.some(([, nm]) => nm === t)) { out = e.b; break; }
       }
       out = out || w;
     }
