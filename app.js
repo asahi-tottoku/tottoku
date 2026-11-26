@@ -625,6 +625,11 @@ function compactHours(text) {
 // 件数は、もう一方の段・フォルダ・検索で絞ったあとの数。選んでいるボタンをもう一度押すと外れる。
 // フォルダは増やさない。選べるものが2つ以上あるときだけ出す。
 const GENRE_NAMES = new Set(Object.keys(Sorter.GENRES));
+// ジャンルの写真(2026-11-26 きよさんが画像生成AIで作った21枚。元は docs/box-art-source/genre-sheet.webp)
+const GENRE_ART = { "焼肉": "yakiniku", "和食": "washoku", "寿司": "sushi", "天ぷら": "tempura", "蕎麦": "soba", "うなぎ": "unagi",
+  "焼き鳥": "yakitori", "洋食": "yoshoku", "イタリアン": "italian", "フレンチ": "french", "スペイン料理": "spanish", "中華": "chuka",
+  "ラーメン": "ramen", "韓国料理": "korean", "エスニック": "ethnic", "カレー": "curry", "ハンバーガー": "burger", "居酒屋": "izakaya",
+  "カフェ": "cafe", "スイーツ": "sweets", "パン": "pan" };
 const GENRE_LABEL = { "蕎麦": "蕎麦・うどん", "お好み焼き": "お好み焼き・たこ焼き", "バー": "バー・お酒" };   // ボタンに出す名前(うどんの店も「蕎麦」に入るので)
 let genreMemo = new WeakMap();   // load() のたびに作り直す
 function genreOf(i) {
@@ -874,9 +879,22 @@ function card(i) {
     th.textContent = (inBoxView() ? "" : bname) || glabel;
     if (th.textContent.length > 6) th.classList.add("long");
   };
+  // ジャンルの写真が無ければ、入っている箱の絵(ゴルフ場・旅行など)
+  const bart = bname ? boxArtOf(boxOf(i), bname) : "";
+  const gart = !i.image && (GENRE_ART[g] ? `genre-art/${GENRE_ART[g]}` : bart ? `box-art/${bart}` : "");
   if (i.image) {
     th.querySelector("img").src = i.image;
     th.querySelector("img").onerror = noimg;
+  } else if (gart) {
+    // ジャンルが分かれば、ジャンルの写真(きよさんが作った絵)。下に小さく、今まで四角に出していた名前を重ねる(2026-11-26)
+    th.classList.add("genre-pic");
+    const img = th.querySelector("img");
+    img.src = `${gart}.webp`;
+    img.onerror = () => { th.classList.remove("genre-pic"); noimg(); };
+    const cap = document.createElement("span");
+    cap.className = "thumb-cap";
+    cap.textContent = (inBoxView() ? "" : bname) || glabel;
+    th.appendChild(cap);
   } else noimg();
   el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : "";   // 種類(その他・飲食店…)は左の四角と重なるので出さない
   const d = distKm(i);

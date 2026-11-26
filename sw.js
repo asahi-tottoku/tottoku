@@ -1,9 +1,11 @@
 // サービスワーカー: 一度開けば、電波が無くても「とっとく」を開けるように、画面のファイルを端末にしまっておく。
 // データ(保存したもの)は IndexedDB にあり、ここでは扱わない。画面を変えたら CACHE の番号を上げる。
-const CACHE = "tottoku-web-v43";
+const CACHE = "tottoku-web-v44";
 const SHELL = ["./", "index.html", "app.js", "localdb.js", "places_jp.js", "sorter.js", "install.js", "style.css",
   "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png",
-  ...["food", "sweets", "yakiniku", "yoshoku", "italian", "golf", "shop", "site", "memo", "travel", "map", "video", "music", "event", "docs", "all", "fav", "tag"].map((k) => `box-art/${k}.webp`)];
+  ...["food", "sweets", "yakiniku", "yoshoku", "italian", "golf", "shop", "site", "memo", "travel", "map", "video", "music", "event", "docs", "all", "fav", "tag"].map((k) => `box-art/${k}.webp`),
+  ...["yakiniku", "washoku", "sushi", "tempura", "soba", "unagi", "yakitori", "yoshoku", "italian", "french", "spanish", "chuka",
+    "ramen", "korean", "ethnic", "curry", "burger", "izakaya", "cafe", "sweets", "pan"].map((k) => `genre-art/${k}.webp`)];
 
 self.addEventListener("install", (e) => {
   // cache: "reload" = ブラウザがしまっている古いファイルではなく、必ずネットから取る
