@@ -1100,6 +1100,9 @@ async function saveBoxOrder(ids) {
 // 箱に入る(スマホの「戻る」で箱の並びに戻れるよう、履歴を1つ足す)
 function enterBox(key) {
   history.pushState({ box: key }, "");
+  showBox(key);
+}
+function showBox(key) {
   activeBox = key;
   activeFolder = "all"; activeArea = "all"; activePref = "all"; activeGenre = null;
   render();
@@ -1375,14 +1378,22 @@ function showMemo(on) {
 $("#memoBtn").onclick = () => { if (memoOpen()) return; history.pushState({ memo: 1 }, ""); showMemo(true); };
 $("#memoBack").onclick = () => history.back();
 window.addEventListener("popstate", () => {
-  if (memoOpen()) { showMemo(false); return; }
-  if (activeBox != null && boxes.length) leaveBox();   // 箱の中から「戻る」で、箱の並びへ
+  if (memoOpen()) showMemo(false);
+  // 履歴の中身に画面を合わせる(箱の中から「戻る」で箱の並びへ。再読み込みのあとに戻った先が箱の中なら、その箱へ)
+  const key = (history.state || {}).box;
+  if (key == null) { if (activeBox != null && boxes.length) leaveBox(); }
+  else if (key !== activeBox && (key === "all" || boxes.some((b) => b.id === key))) {
+    showBox(key);
+  }
 });
 $("#memoForm").onsubmit = async (e) => {
   e.preventDefault();
   const input = $("#memoInput");
   const text = input.value.trim();
   if (!text) { input.focus(); return; }
+  const go = $("#memoForm .go");
+  if (go.disabled) return;   // 二度押しで2件できないように
+  go.disabled = true;
   try {
     await api("/api/items", { method: "POST", body: { text, kind: "memo" } });
     input.value = "";
@@ -1390,6 +1401,8 @@ $("#memoForm").onsubmit = async (e) => {
     toast("メモを保存しました");
   } catch (err) {
     toast("保存できませんでした");
+  } finally {
+    go.disabled = false;
   }
 };
 
@@ -1625,7 +1638,12 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").ca
       body: { url: p.get("url") || "", text: p.get("text") || "", title: p.get("title") || "" } });
     await afterSave(res.id, true, res.learned, res.named);
   } else {
+    // 箱の中・メモの画面で再読み込みしたら、その画面に戻す(履歴は残っているので、戻さないと「戻る」が1回空振りする)
+    const st = history.state || {};
+    if (st.box != null) activeBox = st.box;
     await load();
+    if (st.box != null && (activeBox == null || !boxes.length)) { activeBox = null; history.back(); }   // 箱が消えていた
+    else if (st.memo) showMemo(true);
     checkClip();
   }
 })();
