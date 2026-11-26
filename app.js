@@ -831,7 +831,12 @@ function renderGenres() {
   const count = new Map();
   shown.forEach((i) => { const g = genreOf(i); count.set(g, (count.get(g) || 0) + 1); });
   const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
-  const rows = order.map(([g, n]) => [g, GENRE_LABEL[g] || g, n]);
+  // 上のフォルダの段と同じ名前のジャンル(フォルダ「スイーツ」とジャンル「スイーツ」)は出さない。2回出てしまうため
+  // (2026-11-26 きよさん「C で」)。選んでいる最中のものは残す
+  const fnames = new Set(boxFolders().map((f) => Sorter.fnorm(f.name)));
+  const dup = (g) => [g, ...(GENRE_LABEL[g] || "").split("・")].some((w) => w && fnames.has(Sorter.fnorm(w)));
+  const rows = order.filter(([g]) => g === activeGenre || !dup(g)).map(([g, n]) => [g, GENRE_LABEL[g] || g, n]);
+  if (!rows.length) { box.hidden = true; box.innerHTML = ""; return; }
   chipRow(box, FORK_SVG, rows, activeGenre, (v) => { activeGenre = v === activeGenre ? null : v; });
 }
 // 今の絞り込みを1行で見せる(「📍御殿場 × 🍴焼肉 3件 ✕ 解除」)。地域もジャンルも選んでいなければ出さない
@@ -907,6 +912,7 @@ function render() {
   fixFilters();
   renderAreas();
   renderGenres();
+  $("#chipRow").hidden = $("#areaBar").hidden && $("#genreBar").hidden;
   const list = currentList();
   renderFilterLine(list.length);
   document.querySelectorAll("#viewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.view === view));

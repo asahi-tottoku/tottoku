@@ -90,8 +90,11 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
     </button>
   </div>
-  <div id="areaBar" class="chips area-bar" hidden></div>
-  <div id="genreBar" class="chips genre-bar" hidden></div>
+  <!-- 地域とジャンルは横に続けて1段(横にすべらせる。2026-11-26 きよさん「C で」) -->
+  <div id="chipRow" class="chips" hidden>
+    <div id="areaBar" class="chip-group area-bar" hidden></div>
+    <div id="genreBar" class="chip-group genre-bar" hidden></div>
+  </div>
 
   <div class="viewbar">
     <div id="viewSeg" class="mini-seg dark" role="group" aria-label="見せ方">

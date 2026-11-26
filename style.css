@@ -246,6 +246,10 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 /* 地域・ジャンルの段 */
 .chips { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 12px 0 0; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
+.chip-group { flex: none; display: flex; align-items: center; gap: 8px; }
+.chip-group[hidden] { display: none; }
+/* 地域とジャンルの間の細い線 */
+#areaBar:not([hidden]) + #genreBar:not([hidden])::before { content: ""; flex: none; width: 1px; height: 22px; margin: 0 4px 0 2px; background: var(--line); }
 .chip-mark { flex: none; display: grid; place-items: center; width: 20px; color: var(--muted); }
 .chip { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 13px; font-weight: 700; padding: 0 15px; min-height: 42px; border-radius: 21px;
   background: var(--surface); border: none; color: var(--soft); box-shadow: var(--shade); }
