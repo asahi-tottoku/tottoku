@@ -1469,6 +1469,22 @@ const ACCENTS = [
 
 const BGS = [["fuwa", "ふんわり"], ["sakura", "さくら"], ["sora", "そら"], ["mint", "ミント"], ["shiro", "しろ"]];
 const CARD_COLORS = [["white", "しろ"], ["cream", "クリーム"], ["sakura", "さくら"], ["sora", "そら"], ["mint", "ミント"], ["lavender", "ふじ"]];
+// カードの形の見本の絵(2026-11-26 きよさん「グラフィックに表して」)。塗りは --card-bg なので、カードの色を選ぶと絵の色も変わる
+const SP_LINES = (x, y, w) => `<rect class="sp-ln" x="${x}" y="${y}" width="${w}" height="3" rx="1.5"/><rect class="sp-ln" x="${x}" y="${y + 6}" width="${w * 0.6}" height="3" rx="1.5"/>`;
+const SHAPE_PICS = {
+  float: `<svg class="sp sp-float" viewBox="0 0 88 50" aria-hidden="true">
+    <g transform="rotate(-7 28 26)"><rect class="sp-card" x="10" y="10" width="34" height="30" rx="6"/>${SP_LINES(16, 18, 20)}</g>
+    <g transform="rotate(6 60 24)"><rect class="sp-card" x="44" y="8" width="34" height="30" rx="6"/>${SP_LINES(50, 16, 20)}</g></svg>`,
+  stack: `<svg class="sp sp-stack" viewBox="0 0 88 50" aria-hidden="true">
+    <rect class="sp-back2" x="24" y="4" width="40" height="30" rx="6"/>
+    <rect class="sp-back1" x="18" y="9" width="52" height="30" rx="6"/>
+    <rect class="sp-card" x="12" y="15" width="64" height="31" rx="7"/>${SP_LINES(20, 24, 34)}</svg>`,
+  seal: `<svg class="sp sp-seal" viewBox="0 0 88 50" aria-hidden="true">
+    <rect class="sp-card sp-thick" x="8" y="9" width="34" height="32" rx="7"/>${SP_LINES(15, 18, 18)}
+    <rect class="sp-tint sp-thick" x="46" y="9" width="34" height="32" rx="7"/>${SP_LINES(53, 18, 18)}</svg>`,
+  plain: `<svg class="sp sp-plain" viewBox="0 0 88 50" aria-hidden="true">
+    <rect class="sp-card sp-outline" x="12" y="10" width="64" height="30" rx="6"/>${SP_LINES(20, 19, 34)}</svg>`,
+};
 const SHAPES = [["float", "浮かぶ", "少し傾いて浮く"], ["stack", "重なる", "うしろに2枚"], ["seal", "シール", "箱ごとに色を塗る"], ["plain", "すっきり", "線だけ・傾けない"]];
 
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -1551,7 +1567,7 @@ function renderSettings() {
     b.type = "button";
     b.className = "shape" + ((look.card || "float") === key ? " on" : "");
     b.setAttribute("aria-pressed", String((look.card || "float") === key));
-    b.innerHTML = `<b>${label}</b><small>${note}</small>`;
+    b.innerHTML = `${SHAPE_PICS[key] || ""}<b>${label}</b><small>${note}</small>`;
     b.onclick = () => saveLook({ card: key });
     shapeBox.appendChild(b);
   });
