@@ -834,7 +834,8 @@ function renderGenres() {
   // 上のフォルダの段と同じ名前のジャンル(フォルダ「スイーツ」とジャンル「スイーツ」)は出さない。2回出てしまうため
   // (2026-11-26 きよさん「C で」。v62 で「全部がそのフォルダにあるときだけ隠す」にしたら、フォルダ「洋食」があるのに
   // 札の「洋食」が出て紛らわしかったので、きよさん「C」で、いつも隠す形に戻した)。選んでいる最中のものは残す
-  const fnames = new Set(boxFolders().map((f) => Sorter.fnorm(f.name)));
+  // フォルダ名が「洋食 多国籍」のように区切ってあれば、区切った言葉(「洋食」)でも当てる(v64。きよさん「消えない」)
+  const fnames = new Set(boxFolders().flatMap((f) => [f.name, ...Sorter.splitName(f.name)]).map(Sorter.fnorm));
   const dup = (g) => [g, ...(GENRE_LABEL[g] || "").split("・")].some((w) => w && fnames.has(Sorter.fnorm(w)));
   const rows = order.filter(([g]) => g === activeGenre || !dup(g)).map(([g, n]) => [g, GENRE_LABEL[g] || g, n]);
   if (!rows.length) { box.hidden = true; box.innerHTML = ""; return; }
