@@ -317,7 +317,6 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
   color: var(--accent); font-size: 13px; font-weight: 700; text-decoration: none; border-radius: 12px; }
 .actions .act-reserve[hidden], .actions .act-map[hidden] { display: none; }
 .actions .act-reserve { background: var(--accent); color: var(--on-accent); min-height: 40px; padding: 0 12px; border-radius: 16px; margin-right: 4px; }
-.actions .act-del { margin-left: auto; color: var(--muted); font-weight: 500; }
 
 .empty { color: var(--muted); margin-top: 24px; padding: 16px; border-radius: 22px; background: var(--glass); }
 .empty-title { margin: 0 0 8px; font-weight: 900; font-size: 15px; color: var(--text); text-align: center; }
@@ -449,7 +448,13 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 .set-label { margin: 18px 0 8px; font-size: 13px; font-weight: 900; color: var(--text); }
 /* 項目(背景の色・カードの形…)ごとに薄いグレーの線で区切る(2026-11-26 きよさん) */
 #settingsDlg .set-label, #settingsDlg .howto-box { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e4e5ea; }
-#settingsDlg .sheet-title + .set-label { margin-top: 10px; padding-top: 0; border-top: none; }
+/* 設定の見出しの右に ×(閉じるが一番下だけだったので。2026-11-26 デザインチェック S2) */
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sheet-x { flex: none; width: 44px; height: 44px; margin: -8px -10px -8px 0; border: none; background: none; color: var(--soft); font-size: 26px; line-height: 1; border-radius: 22px; }
+/* 削除は編集の画面の一番下に、目立たせずに(2026-11-26 デザインチェック B4) */
+.sheet-delete { display: block; width: 100%; margin-top: 18px; min-height: 44px; border: none; background: none; color: #d6336c; font-size: 14px; font-weight: 700; }
+:root[data-dark] .sheet-delete { color: #ff8fab; }
+#settingsDlg .sheet-head + .set-label, #settingsDlg .sheet-title + .set-label { margin-top: 10px; padding-top: 0; border-top: none; }
 :root[data-dark] #settingsDlg .set-label, :root[data-dark] #settingsDlg .howto-box { border-top-color: rgba(255,255,255,.12); }
 .set-note { font-size: 12px; color: var(--muted); margin: 12px 0 0; line-height: 1.6; }
 .set-btn { display: block; width: 100%; text-align: center; padding: 11px; margin-bottom: 8px; border: none; border-radius: 16px;
@@ -462,7 +467,10 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 .bg-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .bg-swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: none; background: none; font-size: 11px; color: var(--soft); }
 .bg-swatch span { width: 46px; height: 46px; border-radius: 23px; box-shadow: 0 0 0 1px var(--line); }
-.bg-swatch.on span { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent); }
+.bg-swatch span { position: relative; }
+/* 選んでいる印は、色を選ぶ3つの段(背景・カードの色・差し色)とも「差し色の輪と ✓」にそろえる(2026-11-26 デザインチェック S3) */
+.bg-swatch.on span, .swatch.on { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent); }
+.bg-swatch.on span::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent); font-weight: 900; font-size: 18px; }
 .bg-fuwa span { background: linear-gradient(135deg, #dbe6ff, #ffdcec 55%, #dcf5ea); }
 .bg-sakura span { background: linear-gradient(135deg, #ffe0ec, #fff1f5); }
 .bg-sora span { background: linear-gradient(135deg, #d6ecff, #eef6ff); }
@@ -502,7 +510,6 @@ body.noselect { -webkit-user-select: none; user-select: none; }
 .shape:not(.on) .sp-outline { filter: none; }
 .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
 .swatch { aspect-ratio: 1; width: 100%; padding: 0; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line); position: relative; }
-.swatch.on { box-shadow: 0 0 0 2px var(--text); }
 .swatch.on::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px; }
 .swatch-name { display: block; text-align: center; font-size: 10px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; padding: 3px; border-radius: 16px; background: var(--chip); }

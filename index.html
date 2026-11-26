@@ -141,7 +141,7 @@
 </section>
 
 <dialog id="settingsDlg" class="sheet">
-  <p class="sheet-title">設定</p>
+  <div class="sheet-head"><p class="sheet-title">設定</p><button id="settingsX" class="sheet-x" type="button" aria-label="閉じる">×</button></div>
   <p class="set-label">データ(バックアップ)</p>
   <button id="exportBtn" class="set-btn">⬇ 全部を書き出す<small>バックアップ用のファイル</small></button>
   <button id="importBtn" class="set-btn caution">⬆ ファイルから読み込む<small>今のデータと置き換えます</small></button>
@@ -235,6 +235,7 @@
   <button id="noteSave" class="sheet-ok">保存</button>
   <button id="noteShare" class="sheet-share" type="button">📤 送る(LINE・メールなど)</button>
   <button id="noteCancel" class="sheet-cancel">閉じる</button>
+  <button id="noteDelete" class="sheet-delete" type="button">削除する</button>
 </dialog>
 
 <template id="cardTpl">
@@ -252,7 +253,6 @@
         <button class="act-map" hidden>地図</button>
         <button class="act-note">編集</button>
         <button class="act-share" aria-label="送る(共有)" title="送る(共有)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button>
-        <button class="act-del">削除</button>
       </div>
     </div>
   </li>

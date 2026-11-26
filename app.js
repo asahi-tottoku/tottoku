@@ -516,6 +516,7 @@ function openNote(item) {
   };
   // 送る: 編集の画面の中から(カードの「送る」はここにまとめた)
   $("#noteShare").onclick = () => { dlg.close(); shareItem(item); };
+  $("#noteDelete").onclick = () => { dlg.close(); deleteItem(item); };
   $("#noteSave").onclick = async () => {
     await api(`/api/items/${item.id}`, { method: "PATCH",
       body: edits() });
@@ -990,17 +991,19 @@ function card(i) {
   }
   el.querySelector(".act-note").onclick = () => openNote(i);
   el.querySelector(".act-share").onclick = () => shareItem(i);   // 編集の横の共有アイコン
-  el.querySelector(".act-del").onclick = async () => {
-    // はい・いいえ で確かめてから消す。消したあと8秒だけ「元に戻す」も出す。続けて消したら、まとめて戻せる
-    const short = (i.title || "").length > 20 ? i.title.slice(0, 19) + "…" : (i.title || "これ");
-    if (!await askYesNo("削除してよろしいですか?", `「${short}」`)) return;
-    await api(`/api/items/${i.id}`, { method: "DELETE" });
-    undoItems.push(i);
-    await load();
-    const name = (i.title || "").length > 14 ? i.title.slice(0, 13) + "…" : i.title;
-    toast(undoItems.length > 1 ? `${undoItems.length}件を削除しました` : `「${name}」を削除しました`, undoAct());
-  };
   return el;
+}
+
+// 削除: カードからは外し、編集の画面の一番下に置いた(2026-11-26 デザインチェック B4)。
+// はい・いいえ で確かめてから消す。消したあと8秒だけ「元に戻す」も出す。続けて消したら、まとめて戻せる
+async function deleteItem(i) {
+  const short = (i.title || "").length > 20 ? i.title.slice(0, 19) + "…" : (i.title || "これ");
+  if (!await askYesNo("削除してよろしいですか?", `「${short}」`)) return;
+  await api(`/api/items/${i.id}`, { method: "DELETE" });
+  undoItems.push(i);
+  await load();
+  const name = (i.title || "").length > 14 ? i.title.slice(0, 13) + "…" : i.title;
+  toast(undoItems.length > 1 ? `${undoItems.length}件を削除しました` : `「${name}」を削除しました`, undoAct());
 }
 
 // ---------------------------------------------------------------- 地図
@@ -1736,7 +1739,7 @@ $("#settingsBtn").onclick = () => {
 };
 $("#boxSetBtn").onclick = async () => { $("#settingsDlg").close(); await createBox(); };
 $("#folderSetBtn").onclick = () => { $("#settingsDlg").close(); openFolderMenu(null); };
-$("#settingsClose").onclick = () => $("#settingsDlg").close();
+$("#settingsClose").onclick = $("#settingsX").onclick = () => $("#settingsDlg").close();
 applyLook(getLook());
 
 // ---------------------------------------------------------------- 起動
