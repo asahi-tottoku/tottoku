@@ -23,36 +23,66 @@
 
   async function loadState() {
     if (mem) return mem;
-    const db = await idb();
+    const db = await getDb();
     mem = await new Promise((ok, ng) => {
       const r = db.transaction(STORE).objectStore(STORE).get(KEY);
       r.onsuccess = () => ok(r.result || null);
       r.onerror = () => ng(r.error);
     });
-    db.close();
     if (!mem) mem = { items: [], folders: [], nextItem: 1, nextFolder: 1 };
     // 箱(v25): フォルダより大きいまとまり。箱 > フォルダの2段。前のデータには無いので足す
     if (!Array.isArray(mem.boxes)) mem.boxes = [];
     if (!mem.nextBox) mem.nextBox = Math.max(0, ...mem.boxes.map((b) => b.id)) + 1;
-    for (const it of mem.items) {   // 辞書が増えたとき用: 名前から分かるジャンルをタグに足す
-      const add = S.detectGenres(it.title || "").filter((g) => !(it.tags || []).includes(g));
-      if (add.length) {
-        it.tags = [...(it.tags || []), ...add].slice(0, 8);
-        if (it.category === "その他") it.category = "飲食店";
+    // 辞書が増えたとき用: 名前から分かるジャンルをタグに足す。辞書が変わったとき(指紋が違うとき)だけ全件を見る
+    const sig = S.genreSig();
+    if (mem.genreSig !== sig) {
+      for (const it of mem.items) {
+        const add = S.detectGenres(it.title || "").filter((g) => !(it.tags || []).includes(g));
+        if (add.length) {
+          it.tags = [...(it.tags || []), ...add].slice(0, 8);
+          if (it.category === "その他") it.category = "飲食店";
+        }
       }
+      mem.genreSig = sig;
+      if (mem.items.length) await saveState();   // 次の起動で、もう一度見直さないように
     }
     return mem;
   }
 
-  async function saveState() {
-    const db = await idb();
-    await new Promise((ok, ng) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(mem, KEY);
-      tx.oncomplete = ok;
-      tx.onerror = () => ng(tx.error);
-    });
-    db.close();
+  // 保存: 開いた保存場所は使い回す(毎回開き直すと遅い)。書いている間に次の保存が来たら、
+  // それらをまとめて1回にする(書くのは、その時点の最新のデータ)
+  let dbp = null;
+  function getDb() {
+    if (!dbp) {
+      dbp = idb().then((db) => {
+        db.onclose = () => { dbp = null; };
+        db.onversionchange = () => { db.close(); dbp = null; };
+        return db;
+      }, (e) => { dbp = null; throw e; });
+    }
+    return dbp;
+  }
+  async function writeOnce(retry = true) {
+    try {
+      const db = await getDb();
+      await new Promise((ok, ng) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).put(mem, KEY);
+        tx.oncomplete = ok;
+        tx.onerror = () => ng(tx.error);
+        tx.onabort = () => ng(tx.error);
+      });
+    } catch (e) {
+      dbp = null;   // 閉じられていたなど。一度だけ開き直して書く
+      if (retry) return writeOnce(false);
+      throw e;
+    }
+  }
+  let running = Promise.resolve(), pending = null;
+  function saveState() {
+    if (pending) return pending;
+    pending = running.catch(() => {}).then(() => { pending = null; return (running = writeOnce()); });
+    return pending;
   }
 
   // ブラウザが空き容量のために勝手に消さないよう、頼んでおく(断られても動く)

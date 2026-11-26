@@ -997,10 +997,12 @@ function siteLabel(site) {
 
 function card(i) {
   const el = $("#cardTpl").content.firstElementChild.cloneNode(true);
-  const link = i.url || "#";
+  // URL が無いお店は、リンクにしない(href="#" だと押すたびに履歴が増え、戻ると箱の並びへ戻ってしまう)
+  const link = i.url || null;
+  const setLink = (a) => { if (link) a.href = link; else { a.removeAttribute("target"); a.classList.add("nolink"); } };
   if (i.status === "processing") el.classList.add("processing");
   const th = el.querySelector(".thumb");
-  th.href = link;
+  setLink(th);
   // 絵が無いときは、箱の名前(2026-11-25 きよさん。ジャンルはフォルダの札で分かるので)を、種類ごとの淡い色の上に出す。
   // 箱に入っていなければ、今までどおりジャンル(焼肉・スイーツ…)か種類(動画・買い物…)
   const g = genreOf(i);
@@ -1056,7 +1058,7 @@ function card(i) {
   const meta = el.querySelector(".meta");
   if (![...meta.children].some((s) => s.textContent)) meta.remove();
   const t = el.querySelector(".title");
-  t.textContent = i.title || i.url; t.href = link;
+  t.textContent = i.title || i.url; setLink(t);
   el.querySelector(".summary").textContent = i.summary || "";
 
   const ft = el.querySelector(".folder-tag");
@@ -1172,7 +1174,7 @@ async function renderMap(list) {
     const d = distKm(i);
     const html = `<b>${escapeHtml(i.title)}</b><br><small>${escapeHtml(i.area || "")}${d != null ? " · " + fmtKm(d) : ""}</small>` +
       (todayHours(i) ? `<br><small>${escapeHtml(todayHours(i))}</small>` : "") +
-      `<br><a href="${escapeHtml(i.url || "#")}" target="_blank" rel="noopener">開く</a>` +
+      (i.url ? `<br><a href="${escapeHtml(i.url)}" target="_blank" rel="noopener">開く</a>` : "") +
       (i.reserve_url ? ` · <a href="${escapeHtml(i.reserve_url)}" target="_blank" rel="noopener">予約</a>` : "");
     mapLayer.addLayer(L.marker([i.lat, i.lng], { icon }).bindPopup(html));
     pts.push([i.lat, i.lng]);

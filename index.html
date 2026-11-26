@@ -20,10 +20,11 @@
     if (s.theme === "dark" || (s.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)) d.dark = "";
   } catch (e) { Object.assign(document.documentElement.dataset, { accent: "ai", bg: "fuwa", card: "float", cardbg: "white" }); }
 </script>
-<!-- 字の形(丸ゴシックと数字用の等幅)。読めないとき(電波が無いなど)は、端末の字で出る -->
+<!-- 字の形(丸ゴシックと数字用の等幅)。読めないとき(電波が無いなど)は、端末の字で出る。
+     読み込みを待たずに画面を出す(media="print" で読み始め、届いたら当てる。電波が弱くても最初の表示が遅れない) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=DM+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=DM+Mono:wght@500&display=swap" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>

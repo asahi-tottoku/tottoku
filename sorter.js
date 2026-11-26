@@ -497,7 +497,18 @@
     return { genres, place };
   }
 
-  const api = { fnorm, GENRES, AREAS, NEIGHBORS, resolveToken, splitName, folderMatch, itemTexts, pickFolder, topFolders,
+  // ジャンルの辞書と決まりの「指紋」。変わったときだけ、保存済みのお店にジャンルを付け直す(起動のたびに全件見ると重い)
+  let sigCache = null;
+  function genreSig() {
+    if (sigCache) return sigCache;
+    const src = JSON.stringify([GENRES, STRICT, KANA_WORDS, MORE_WORDS, URL_GENRES], (k, v) => (v instanceof RegExp ? String(v) : v)) +
+      detectGenres.toString() + hasKanaWord.toString();
+    let h = 0;
+    for (let n = 0; n < src.length; n++) h = (Math.imul(h, 31) + src.charCodeAt(n)) | 0;
+    return (sigCache = src.length + ":" + (h >>> 0).toString(36));
+  }
+
+  const api = { fnorm, genreSig, GENRES, AREAS, NEIGHBORS, resolveToken, splitName, folderMatch, itemTexts, pickFolder, topFolders,
     detectGenres, detectPlace, urlHints, placeFromCoords, areaGroup, prefOf, prefIn };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Sorter = api;

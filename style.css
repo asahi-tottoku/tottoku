@@ -98,8 +98,8 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 6px 20px;
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  /* ぼかし(backdrop-filter)は、スクロールのたびに後ろを描き直して重いのでやめ、帯を少し濃くした(2026-11-26) */
+  background: color-mix(in srgb, var(--bg) 93%, transparent);
 }
 .top-left { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .brand { font-size: 24px; font-weight: 900; letter-spacing: .04em; line-height: 44px; }
@@ -190,7 +190,6 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 }
 /* 「3 はこ / 7 件」は日本語なので等幅にしない */
 #boxStat { font-family: inherit; letter-spacing: .02em; font-size: 12px; color: var(--soft); }
-.box-no { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--muted); font-weight: 500; }
 .box-name { font-size: 22px; font-weight: 900; margin-top: 6px; line-height: 1.3; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .box-sub { font-size: 12px; font-weight: 500; line-height: 1.5; color: var(--muted); margin-top: 4px; padding-right: 44px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -271,7 +270,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 /* ---------- お店のカード ---------- */
 .list { list-style: none; margin: 0; padding: 2px 0 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .card { display: flex; gap: 10px; padding: 12px 12px 2px; border-radius: 22px; background: var(--card-bg);
-  box-shadow: 0 20px 34px -18px var(--glow-base), var(--shade); }
+  box-shadow: 0 14px 22px -14px var(--glow-base), var(--shade); }   /* 影は小さめ(件数が多いと重い。2026-11-26) */
 .card.processing { opacity: .7; }
 .thumb { flex: none; width: 64px; height: 64px; border-radius: 16px; overflow: hidden; display: block; background: var(--k); color: var(--ki); }
 .thumb.k-0 { --k: var(--k0); --ki: var(--ki0); }
@@ -304,6 +303,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 /* 押せる高さを 44px 近くに(見た目の位置は前と同じ。2026-11-26 デザインチェック) */
 .title { display: block; font-size: 17px; font-weight: 900; line-height: 1.35; margin: -8px 0 -10px; padding: 10px 0; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
 .title:hover { text-decoration: underline; }
+.title.nolink:hover { text-decoration: none; }
 .summary { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .summary:empty, .who:empty { display: none; }
 .who { margin: 2px 0 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
@@ -349,8 +349,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 :root[data-card="float"] .box-card:nth-child(5n+3) { transform: rotate(1.1deg); }
 :root[data-card="float"] .box-card:nth-child(5n+4) { transform: rotate(-1.3deg) translateY(6px); }
 :root[data-card="float"] .box-card:nth-child(5n)   { transform: rotate(-.8deg); }
-:root[data-card="float"] .card:nth-child(odd)  { transform: rotate(-.4deg); }
-:root[data-card="float"] .card:nth-child(even) { transform: rotate(.35deg); }
+/* お店のカード(何百枚にもなる)は傾けない。傾きはほとんど見えないのに、1枚ずつ描き直しが要って重い(2026-11-26) */
 :root[data-card="float"] .memo-card:nth-child(odd)  { transform: rotate(-1.2deg); }
 :root[data-card="float"] .memo-card:nth-child(even) { transform: rotate(1deg); }
 /* 重なる: すりガラスのカードの上に、うしろの2枚がのぞく */
@@ -365,7 +364,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
   background: color-mix(in srgb, var(--surface) 60%, var(--glow)); }
 /* シール: 箱ごとの色で塗り、白いふち。件数は大きな数字 */
 :root[data-card="seal"] .box-card { background: var(--tint); color: var(--ink); border: 4px solid var(--surface); box-shadow: 0 6px 16px -8px rgba(40,50,110,.25); }
-:root[data-card="seal"] .box-card .box-no, :root[data-card="seal"] .box-card .box-sub { color: var(--ink); opacity: .85; }
+:root[data-card="seal"] .box-card .box-sub { color: var(--ink); opacity: .85; }
 :root[data-card="seal"] .box-n { position: static; margin-top: auto; background: none; color: var(--ink); min-width: 0; height: auto; padding: 0; font-size: 34px; line-height: 1; }
 :root[data-card="seal"] .box-sub { padding-right: 0; }
 :root[data-card="seal"] .memo-card { border: 4px solid var(--surface); box-shadow: 0 6px 16px -8px rgba(40,50,110,.25); }
