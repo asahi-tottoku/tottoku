@@ -1041,6 +1041,56 @@ function fixedPos() {
   return { all: 0, memo: 1 };
 }
 
+// 箱の絵と線のアイコン(2026-11-26 きよさん「サンプル画像みたいにして使いたい」)。
+// 箱の名前に入っている言葉で選ぶ。上から順に見て、最初に合ったもの。合わなければ絵なし・箱のアイコン
+const BOX_ART = [
+  ["sweets", ["スイーツ", "ケーキ", "カフェ", "甘", "パン", "和菓子", "お菓子"]],
+  ["yakiniku", ["焼肉", "焼き肉", "ステーキ", "肉", "bbq"]],
+  ["italian", ["イタリア", "パスタ", "ピザ", "ピッツァ"]],
+  ["yoshoku", ["洋食", "ハンバーグ", "フレンチ", "ビストロ"]],
+  ["food", ["食事", "ごはん", "ご飯", "グルメ", "レストラン", "ランチ", "ディナー", "飲食", "食べ", "ラーメン", "中華", "和食", "寿司", "居酒屋", "飲み"]],
+  ["golf", ["ゴルフ"]],
+  ["shop", ["ショップ", "買い物", "ショッピング", "通販", "ほしい", "欲しい"]],
+  ["site", ["サイト", "web", "ウェブ", "ネット", "リンク"]],
+  ["memo", ["メモ", "ノート"]],
+  ["travel", ["旅行", "旅", "観光", "ホテル", "宿", "温泉", "おでかけ", "お出かけ"]],
+  ["map", ["地図", "場所", "スポット", "マップ"]],
+  ["video", ["動画", "映画", "youtube", "ドラマ", "アニメ"]],
+  ["music", ["音楽", "曲", "ライブ", "歌"]],
+  ["event", ["イベント", "予定", "行事", "チケット"]],
+  ["docs", ["資料", "本", "読", "勉強", "仕事", "記事"]],
+  ["fav", ["お気に入り", "好き", "★", "推し"]],
+  ["tag", ["タグ"]],
+];
+const BOX_ICON = {
+  food: '<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1-3.5 4-3.5 8H17"/>',
+  sweets: '<path d="M4 21h16M5 21v-7h14v7M5 14c2.3-1.6 4.7 1.6 7 0s4.7 1.6 7 0M12 14v-3M12 8.5a1.2 1.2 0 1 0 0-.01"/>',
+  yakiniku: '<path d="M12 3c1 4 6 5.5 6 11a6 6 0 0 1-12 0c0-3 1.5-5 3-6 0 2 1 3.3 2.2 3.3C11.2 8.5 10 6 12 3z"/>',
+  italian: '<path d="M3.5 6.5 12 21l8.5-14.5M3.5 6.5C9 3.5 15 3.5 20.5 6.5M10 10.5h.01M14 11h.01M12 15h.01"/>',
+  golf: '<path d="M6 21V3l11 4.5L6 12"/>',
+  shop: '<path d="M3 4h2.5l2.3 11h10.4l2-8H6.3"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="16.5" cy="19.5" r="1.3"/>',
+  site: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.4 3.2 14.6 0 18M12 3c-3.2 3.4-3.2 14.6 0 18"/>',
+  memo: '<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>',
+  travel: '<path d="M2.5 13.5 21.5 6l-3.5 13-6-4.5-3 4v-5.5z"/>',
+  map: '<path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20zM9 4v13.5M15 6.5V20"/>',
+  video: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/>',
+  music: '<path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+  event: '<rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  docs: '<path d="M2.5 5.5h6.5a3 3 0 0 1 3 3V21a2 2 0 0 0-2-2H2.5zM21.5 5.5H15a3 3 0 0 0-3 3V21a2 2 0 0 1 2-2h7.5z"/>',
+  all: '<path d="m12 3 9 4.8-9 4.8-9-4.8zM3 12.2l9 4.8 9-4.8M3 16.6l9 4.8 9-4.8"/>',
+  fav: '<path d="m12 3 2.8 5.8 6.2.8-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.8z"/>',
+  tag: '<path d="M3 12V4h8l10 10-8 8zM7.5 7.5h.01"/>',
+  box: '<path d="m3 8 9-5 9 5v8.5l-9 5-9-5zM3 8l9 5 9-5M12 13v8.5"/>',
+};
+BOX_ICON.yoshoku = BOX_ICON.food;
+function boxArtOf(key, name) {
+  if (key === "all" || key === "memo") return key;
+  const n = String(name || "").toLowerCase();
+  const hit = BOX_ART.find(([, words]) => words.some((w) => n.includes(w)));
+  return hit ? hit[0] : "";
+}
+const boxIconSvg = (art) => `<svg class="box-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BOX_ICON[art] || BOX_ICON.box}</svg>`;
+
 function renderBoxes() {
   const grid = $("#boxGrid");
   grid.innerHTML = "";
@@ -1059,7 +1109,10 @@ function renderBoxes() {
     a.className = `box-card tint-${c.key === "memo" ? 1 : tintOf(c.key)} sortable`;
     a.dataset.key = c.key;
     // 「01 / 05」の番号は意味がないので出さない(2026-11-26 デザインチェック)
-    a.innerHTML = `<span class="box-name"></span><span class="box-sub"></span><span class="box-n"></span>`;
+    const art = boxArtOf(c.key, c.name);
+    a.innerHTML = (art ? `<img class="box-art" src="box-art/${art}.webp" alt="" loading="lazy" decoding="async">` : "") +
+      `<span class="box-title">${boxIconSvg(art)}<span class="box-name"></span></span><span class="box-sub"></span><span class="box-n"></span>`;
+    if (art) a.classList.add("has-art");
     a.querySelector(".box-name").textContent = c.name;
     // 説明: 「すべて」は決まった文、ほかは新しいもの2つの名前
     a.querySelector(".box-sub").textContent = c.key === "all" ? "箱の外のものも全部"
