@@ -1638,6 +1638,7 @@ $("#filterInput").oninput = () => { clearTimeout(filterTimer); filterTimer = set
 $("#filterInput").onkeydown = (e) => {
   if (e.key !== "Enter") return;
   e.preventDefault();
+  if (filterTimer) { clearTimeout(filterTimer); filterTimer = 0; render(); }   // 待っている描き直しを先に済ませる
   if (searchMode === "web") {
     const w = searchText();
     if (w) { $("#filterInput").blur(); window.open(googleUrl(w), "_blank", "noopener"); }
