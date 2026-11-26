@@ -203,6 +203,18 @@
   <button class="sheet-cancel" onclick="this.closest('dialog').close()">やめる</button>
 </dialog>
 
+<dialog id="newFolderDlg" class="sheet">
+  <p class="sheet-title">新しいフォルダ</p>
+  <label class="set-label" for="newFolderName">名前</label>
+  <input id="newFolderName" type="text" class="field" placeholder="例:行きたい店、あとで読む、御殿場 焼肉" autocomplete="off" enterkeyhint="done" maxlength="60">
+  <div id="newFolderBoxRow">
+    <label class="set-label" for="newFolderBox">入れる箱</label>
+    <select id="newFolderBox" class="field box-select"></select>
+  </div>
+  <button id="newFolderOk" type="button" class="sheet-ok">作る</button>
+  <button id="newFolderCancel" type="button" class="sheet-cancel">やめる</button>
+</dialog>
+
 <dialog id="folderDlg" class="sheet">
   <p id="folderDlgTitle" class="sheet-title">フォルダの管理</p>
   <div id="folderDlgList" class="sheet-list"></div>
@@ -227,6 +239,10 @@
   <input id="titleInput" type="text" class="field" placeholder="例:炭火焼肉 するが" autocomplete="off">
   <label class="set-label" for="areaInput">地域</label>
   <input id="areaInput" type="text" class="field" placeholder="例:御殿場" autocomplete="off">
+  <div id="noteBoxRow">
+    <label class="set-label" for="noteBox">箱</label>
+    <select id="noteBox" class="field box-select"></select>
+  </div>
   <label class="set-label" for="noteFolder">フォルダ</label>
   <button id="noteFolder" type="button" class="field note-folder"></button>
   <button id="noteWho" type="button" class="note-who" hidden></button>

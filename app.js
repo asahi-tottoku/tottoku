@@ -90,15 +90,45 @@ function escapeHtml(s) {
 }
 
 // ---------------------------------------------------------------- フォルダ
-// 箱の中で作ったフォルダは、その箱に入る
-async function createFolder() {
-  const where = inBoxView() ? `(箱「${boxName(activeBox)}」に入ります)` : "";
-  const name = (prompt(`新しいフォルダの名前${where}\n例:行きたい店、あとで読む、御殿場 焼肉`) || "").trim();
-  if (!name) return null;
-  const res = await api("/api/folders", { method: "POST", body: { name, box_id: inBoxView() ? activeBox : null } });
-  if (res.error) { toast(res.error); return null; }
-  toast(`「${name}」を作りました`);
-  return res.id;
+// 箱の選択肢(新しいフォルダ・編集の「箱」欄)。value は箱のid、"" = 箱に入れない
+function fillBoxSelect(sel, cur) {
+  sel.innerHTML = "";
+  const add = (value, label) => { const o = document.createElement("option"); o.value = value; o.textContent = label; sel.appendChild(o); };
+  boxes.forEach((b) => add(String(b.id), b.name));
+  add("", "箱に入れない(「すべて」だけに出る)");
+  sel.value = cur == null ? "" : String(cur);
+}
+const selBox = (sel) => (sel.value === "" ? null : Number(sel.value));
+
+// 新しいフォルダを作る。名前と「入れる箱」を聞く(2026-11-26 きよさん「作ったフォルダがどこにも出てこない」。
+// 箱の外で作ると、どの箱にも入らず箱の並びから見えなかった)。箱の中で作るときは、その箱を選んだ状態で開く。
+// 箱の外で作るときは、先頭の箱を選んだ状態(箱に入れないも選べる)。箱が1つも無ければ箱の欄は出さない
+function createFolder() {
+  const dlg = $("#newFolderDlg"), input = $("#newFolderName"), sel = $("#newFolderBox");
+  input.value = "";
+  $("#newFolderBoxRow").hidden = !boxes.length;
+  fillBoxSelect(sel, inBoxView() ? activeBox : boxes.length ? boxes[0].id : null);
+  return new Promise((resolve) => {
+    let id = null;
+    const ok = async () => {
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      const box_id = boxes.length ? selBox(sel) : null;
+      const res = await api("/api/folders", { method: "POST", body: { name, box_id } });
+      if (res.error) { toast(res.error); return; }
+      id = res.id;
+      // 今いる箱と違う箱に入れたら、どこに入ったかを知らせる
+      toast(box_id != null && box_id !== activeBox ? `「${name}」を箱「${boxName(box_id)}」に作りました` : `「${name}」を作りました`);
+      dlg.close();
+    };
+    $("#newFolderOk").onclick = ok;
+    input.onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); ok(); } };
+    $("#newFolderCancel").onclick = () => dlg.close();
+    dlg.onclick = (e) => { if (e.target === dlg) dlg.close(); };
+    dlg.onclose = () => resolve(id);
+    dlg.showModal();
+    input.focus();
+  });
 }
 
 
@@ -506,8 +536,23 @@ function openNote(item) {
   who.hidden = !item.recommender;
   who.textContent = `👤 ${item.recommender || ""}のおすすめ を消す`;
   who.onclick = () => { dropWho = true; who.hidden = true; };
+  // 箱: 箱があるときだけ出す。今の箱と違う箱を選んだら、フォルダから出してその箱の「フォルダなし」に置く
+  // (フォルダは箱の中にあるので、フォルダごと移すとほかのお店まで動いてしまう。2026-11-26 きよさん)
+  const nb = $("#noteBox");
+  $("#noteBoxRow").hidden = !boxes.length;
+  fillBoxSelect(nb, boxOf(item));
+  const boxEdit = () => {
+    if (!boxes.length) return {};
+    const b = selBox(nb);
+    return b === boxOf(item) ? {} : { box: b, ...(folderName(item.folder_id) ? { folder: null } : {}) };
+  };
+  nb.onchange = () => {
+    const f = folderName(item.folder_id);
+    const fb = (folders.find((x) => x.id === item.folder_id) || {}).box_id ?? null;
+    $("#noteFolder").textContent = f && selBox(nb) !== fb ? "フォルダなし(箱を変えるため)" : `${f || "フォルダなし"}${f && !item.folder_manual ? "(自動)" : ""}`;
+  };
   const edits = () => ({ title: $("#titleInput").value.trim() || item.title, area: $("#areaInput").value.trim(),
-    note: $("#noteInput").value.trim(), ...(dropWho ? { recommender: "" } : {}) });
+    note: $("#noteInput").value.trim(), ...(dropWho ? { recommender: "" } : {}), ...boxEdit() });
   // フォルダを選ぶ画面へ。ここまでに書いた名前・地域・メモは先に保存し、一覧も読み直す
   // (読み直さないと、フォルダの画面を閉じたとき古い名前のまま。自動のフォルダが変わることもある)
   $("#noteFolder").onclick = async () => {
