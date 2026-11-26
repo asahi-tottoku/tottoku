@@ -1394,8 +1394,37 @@ function chooseBoxFolders(bid) {
   if (!dlg.open) dlg.showModal();
 }
 
-// 箱のメニュー(箱の中の見出しの「⋯」): 名前を変える・入れるフォルダを選ぶ・箱を削除
-function openBoxMenu(bid) {
+// 箱の管理(設定から): 新しい箱を作る・箱の一覧。箱を押すと、その箱のメニュー(名前を変える・削除…)
+// (2026-11-26 きよさん「フォルダの管理のように、箱の管理も。一覧・名前を変える・削除(中身は消えない)」)
+function openBoxManage() {
+  const dlg = $("#folderDlg"), list = $("#folderDlgList");
+  $("#folderDlgTitle").textContent = "箱の管理";
+  $("#folderDlgSub").hidden = true;
+  $("#folderOrder").hidden = true;
+  list.innerHTML = "";
+  const add = document.createElement("button");
+  add.className = "accent";
+  add.textContent = "＋ 新しい箱を作る";
+  add.onclick = async () => { dlg.close(); await createBox(); };
+  list.appendChild(add);
+  boxes.forEach((b) => {
+    const nf = folders.filter((f) => f.box_id === b.id).length, ni = items.filter((i) => boxOf(i) === b.id).length;
+    const e = document.createElement("button");
+    e.innerHTML = "📦 " + escapeHtml(b.name) + `<span class="hint">フォルダ ${nf}・${ni}件 ›</span>`;
+    e.onclick = () => { dlg.close(); openBoxMenu(b.id, true); };
+    list.appendChild(e);
+  });
+  const note = document.createElement("p");
+  note.className = "sheet-sub";
+  note.style.whiteSpace = "normal";   // 1行で切れないように
+  note.textContent = boxes.length ? "押すと名前を変える・削除。並べ替えは最初の画面で箱を長押し" : "箱はまだありません";
+  list.appendChild(note);
+  if (!dlg.open) dlg.showModal();
+}
+
+// 箱のメニュー(箱の中の見出しの「⋯」・箱の管理から): 名前を変える・入れるフォルダを選ぶ・箱を削除
+// fromManage: 箱の管理から開いたとき。終わったら箱の管理に戻る
+function openBoxMenu(bid, fromManage = false) {
   const dlg = $("#folderDlg"), list = $("#folderDlgList");
   const name = boxName(bid);
   $("#folderDlgTitle").textContent = "📦 " + name;
@@ -1410,20 +1439,26 @@ function openBoxMenu(bid) {
     list.appendChild(b);
   };
   btn("📁 入れるフォルダを選ぶ", () => chooseBoxFolders(bid), "accent");
+  const back = () => { if (fromManage) openBoxManage(); };
   btn("✏️ 名前を変える", async () => {
     const v = (prompt("新しい名前", name) || "").trim();
-    if (!v || v === name) return;
+    if (!v || v === name) return back();
     const res = await api(`/api/boxes/${bid}`, { method: "PATCH", body: { name: v } });
     if (res && res.error) toast(res.error);
-    load();
+    else toast(`箱の名前を「${v}」にしました`);
+    await load();
+    back();
   });
   btn("🗑 箱を削除<span class=\"hint\">中のフォルダ・お店は消えません</span>", async () => {
-    if (!await askYesNo(`箱「${name}」を削除してよろしいですか?`, "中のフォルダやお店は消えずに、箱の外(「すべて」)に戻ります。")) return;
+    if (!await askYesNo(`箱「${name}」を削除してよろしいですか?`, "中のフォルダやお店は消えずに、箱の外(「すべて」)に戻ります。")) return back();
     await api(`/api/boxes/${bid}`, { method: "DELETE" });
-    if (history.state && history.state.box != null) history.back(); else leaveBox();
+    // 消した箱の中にいたときだけ箱の並びへ戻る(箱の管理から、ほかの箱を消したときは今の画面のまま)
+    if (activeBox === bid) { if (history.state && history.state.box != null) history.back(); else leaveBox(); }
     await load();
     toast(`箱「${name}」を削除しました`);
+    back();
   }, "danger");
+  if (fromManage) btn("‹ 箱の管理に戻る", back);
   dlg.showModal();
 }
 $("#boxMenuBtn").onclick = () => { if (inBoxView()) openBoxMenu(activeBox); };
@@ -1870,10 +1905,10 @@ $("#importFile").onchange = async (e) => {
 
 $("#settingsBtn").onclick = () => {
   $("#folderSetBtn").innerHTML = folders.length ? "📁 フォルダの管理<small>作る・並べ替え・振り分け</small>" : "📁 フォルダを作る";
-  $("#boxSetBtn").innerHTML = boxes.length ? `📦 箱を作る<small>今 ${boxes.length}個</small>` : "📦 箱を作る<small>食事・サイト・旅行…のまとまり</small>";
+  $("#boxSetBtn").innerHTML = boxes.length ? `📦 箱の管理<small>作る・名前を変える・削除(今 ${boxes.length}個)</small>` : "📦 箱を作る<small>食事・サイト・旅行…のまとまり</small>";
   renderSettings(); $("#settingsDlg").showModal();
 };
-$("#boxSetBtn").onclick = async () => { $("#settingsDlg").close(); await createBox(); };
+$("#boxSetBtn").onclick = async () => { $("#settingsDlg").close(); if (boxes.length) openBoxManage(); else await createBox(); };
 $("#folderSetBtn").onclick = () => { $("#settingsDlg").close(); openFolderMenu(null); };
 $("#settingsClose").onclick = $("#settingsX").onclick = () => $("#settingsDlg").close();
 applyLook(getLook());
