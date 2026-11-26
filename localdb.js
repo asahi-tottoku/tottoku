@@ -21,15 +21,22 @@
     });
   }
 
-  async function loadState() {
-    if (mem) return mem;
+  // 同時に呼ばれても、読み込みは1回だけ(2回読むと、あとの読み込みが先に足したものを置き換えてしまう)
+  let loading = null;
+  function loadState() {
+    if (mem) return Promise.resolve(mem);
+    if (!loading) loading = loadOnce().finally(() => { loading = null; });
+    return loading;
+  }
+  async function loadOnce() {
     const db = await getDb();
-    mem = await new Promise((ok, ng) => {
+    let m = await new Promise((ok, ng) => {
       const r = db.transaction(STORE).objectStore(STORE).get(KEY);
       r.onsuccess = () => ok(r.result || null);
       r.onerror = () => ng(r.error);
     });
-    if (!mem) mem = { items: [], folders: [], nextItem: 1, nextFolder: 1 };
+    if (!m) m = { items: [], folders: [], nextItem: 1, nextFolder: 1 };
+    mem = m;
     // 箱(v25): フォルダより大きいまとまり。箱 > フォルダの2段。前のデータには無いので足す
     if (!Array.isArray(mem.boxes)) mem.boxes = [];
     if (!mem.nextBox) mem.nextBox = Math.max(0, ...mem.boxes.map((b) => b.id)) + 1;
@@ -44,8 +51,9 @@
         }
       }
       mem.genreSig = sig;
-      // 次の起動で、もう一度見直さないように。書けなくても(容量がいっぱいなど)読み込みは止めない(次の保存で一緒に書かれる)
-      if (mem.items.length) await saveState().catch(() => {});
+      // 次の起動で、もう一度見直さないように。書き終わりは待たない(最初の画面を遅らせない)。
+      // 書けなくても(容量がいっぱいなど)読み込みは止めない(次の保存で一緒に書かれる)
+      if (mem.items.length) saveState().catch(() => {});
     }
     return mem;
   }
@@ -55,11 +63,13 @@
   let dbp = null;
   function getDb() {
     if (!dbp) {
-      dbp = idb().then((db) => {
-        db.onclose = () => { dbp = null; };
-        db.onversionchange = () => { db.close(); dbp = null; };
+      const p = idb().then((db) => {
+        // 古いつなぎの知らせで、新しいつなぎを忘れないように(自分が今のつなぎのときだけ消す)
+        db.onclose = () => { if (dbp === p) dbp = null; };
+        db.onversionchange = () => { db.close(); if (dbp === p) dbp = null; };
         return db;
-      }, (e) => { dbp = null; throw e; });
+      }, (e) => { if (dbp === p) dbp = null; throw e; });
+      dbp = p;
     }
     return dbp;
   }
@@ -74,8 +84,12 @@
         tx.onabort = () => ng(tx.error);
       });
     } catch (e) {
-      dbp = null;   // 閉じられていたなど。一度だけ開き直して書く
-      if (retry) return writeOnce(false);
+      // つなぎが閉じられていたときだけ、開き直して一度だけ書き直す(容量がいっぱいなどは、やり直しても同じなのでしない)
+      if (retry && e && e.name === "InvalidStateError") {
+        const old = dbp; dbp = null;
+        if (old) old.then((db) => db.close(), () => {});
+        return writeOnce(false);
+      }
       throw e;
     }
   }

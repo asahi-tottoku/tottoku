@@ -832,9 +832,13 @@ function renderGenres() {
   shown.forEach((i) => { const g = genreOf(i); count.set(g, (count.get(g) || 0) + 1); });
   const order = [...count].sort((a, b) => (a[0] === "その他") - (b[0] === "その他") || b[1] - a[1]);
   // 上のフォルダの段と同じ名前のジャンル(フォルダ「スイーツ」とジャンル「スイーツ」)は出さない。2回出てしまうため
-  // (2026-11-26 きよさん「C で」)。選んでいる最中のものは残す
-  const fnames = new Set(boxFolders().map((f) => Sorter.fnorm(f.name)));
-  const dup = (g) => [g, ...(GENRE_LABEL[g] || "").split("・")].some((w) => w && fnames.has(Sorter.fnorm(w)));
+  // (2026-11-26 きよさん「C で」)。ただし、そのジャンルのお店が全部その名前のフォルダに入っているときだけ
+  // (フォルダ「うどん」の外にそば屋さんがあれば「蕎麦・うどん」は出す。/code-review の気づき)。選んでいる最中のものは残す
+  const names = (g) => new Set([g, ...(GENRE_LABEL[g] || "").split("・")].filter(Boolean).map(Sorter.fnorm));
+  const dup = (g) => {
+    const ns = names(g);
+    return shown.every((i) => genreOf(i) !== g || ns.has(Sorter.fnorm(folderName(i.folder_id) || "")));
+  };
   const rows = order.filter(([g]) => g === activeGenre || !dup(g)).map(([g, n]) => [g, GENRE_LABEL[g] || g, n]);
   if (!rows.length) { box.hidden = true; box.innerHTML = ""; return; }
   chipRow(box, FORK_SVG, rows, activeGenre, (v) => { activeGenre = v === activeGenre ? null : v; });
