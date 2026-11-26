@@ -497,7 +497,7 @@ function openNote(item) {
   growNote();
   // 「教えてくれた人」の欄は外し、フォルダを変えるボタンにした(2026-11-26 きよさん)。入っていた人の名前はデータに残す
   const fname = folderName(item.folder_id);
-  $("#noteFolder").textContent = `📁 ${fname || "フォルダなし"}${fname && !item.folder_manual ? "(自動)" : ""} ▾`;
+  $("#noteFolder").textContent = `${fname || "フォルダなし"}${fname && !item.folder_manual ? "(自動)" : ""}`;
   // 前に入れた「教えてくれた人」は、ここで消せる(押すと保存のときに消える)
   let dropWho = false;
   const who = $("#noteWho");
@@ -883,6 +883,18 @@ function showResults() {
   setTimeout(() => (view === "map" ? $("#mapBox") : $("#list")).scrollIntoView({ behavior: "smooth", block: "start" }), 150);
 }
 
+// よく出るサイトは日本語の名前で出す(2026-11-26 デザインチェック)。ほかはドメインのまま
+const SITE_NAME = { "tabelog.com": "食べログ", "s.tabelog.com": "食べログ", "hotpepper.jp": "ホットペッパー", "retty.me": "Retty",
+  "gnavi.co.jp": "ぐるなび", "r.gnavi.co.jp": "ぐるなび", "ikyu.com": "一休", "restaurant.ikyu.com": "一休",
+  "amazon.co.jp": "Amazon", "rakuten.co.jp": "楽天", "item.rakuten.co.jp": "楽天", "youtube.com": "YouTube", "m.youtube.com": "YouTube",
+  "youtu.be": "YouTube", "instagram.com": "Instagram", "x.com": "X", "twitter.com": "X", "tiktok.com": "TikTok",
+  "google.com": "Google", "maps.google.com": "Google マップ", "maps.app.goo.gl": "Google マップ", "jalan.net": "じゃらん" };
+function siteLabel(site) {
+  if (!site) return "";
+  const h = site.replace(/^www\./, "");
+  return SITE_NAME[h] || h;
+}
+
 function card(i) {
   const el = $("#cardTpl").content.firstElementChild.cloneNode(true);
   const link = i.url || "#";
@@ -907,27 +919,30 @@ function card(i) {
   // ただし料理の絵(パスタ・ケーキ…)は、ジャンルの分からない店に出すと別の料理の店に見えるので使わない(2026-11-26)
   const bart0 = bname ? boxArtOf(boxOf(i), bname) : "";
   const bart = ["food", "sweets", "yakiniku", "yoshoku", "italian"].includes(bart0) ? "" : bart0;
-  const gart = !i.image && (GENRE_ART[g] ? `genre-art/${GENRE_ART[g]}` : bart ? `box-art/${bart}` : "");
-  if (i.image) {
-    th.querySelector("img").src = i.image;
-    th.querySelector("img").onerror = noimg;
-  } else if (gart) {
-    // ジャンルが分かれば、ジャンルの写真(きよさんが作った絵)。下に小さく、今まで四角に出していた名前を重ねる(2026-11-26)
+  const gart = GENRE_ART[g] ? `genre-art/${GENRE_ART[g]}` : bart ? `box-art/${bart}` : "";
+  // ジャンルが分かれば、ジャンルの写真(きよさんが作った絵)。下に小さく、今まで四角に出していた名前を重ねる(2026-11-26)
+  const showArt = () => {
     th.classList.add("genre-pic");
     const img = th.querySelector("img");
-    img.src = `${gart}.webp`;
     img.onerror = () => { th.classList.remove("genre-pic"); noimg(); };
+    img.src = `${gart}.webp`;
     const cap = document.createElement("span");
     cap.className = "thumb-cap";
     cap.textContent = (inBoxView() ? "" : bname) || glabel;
     if ([...cap.textContent].length >= 5) cap.classList.add("long");
     th.appendChild(cap);
-  } else noimg();
+  };
+  if (i.image) {
+    // お店の写真が読めないときは、ジャンルの写真に(無ければ字)(2026-11-26 点検の残り)
+    th.querySelector("img").onerror = gart ? showArt : noimg;
+    th.querySelector("img").src = i.image;
+  } else if (gart) showArt();
+  else noimg();
   el.querySelector(".cat").textContent = i.status === "processing" ? "整理中…" : "";   // 種類(その他・飲食店…)は左の四角と重なるので出さない
   const d = distKm(i);
   el.querySelector(".dist").textContent = d != null ? "📍" + fmtKm(d) : "";
   // 保存した日時は出さない(2026-11-25 きよさん「いらない」。並びの「新しい順」は今までどおり)。サイト名だけ残す
-  el.querySelector(".date").textContent = i.site ? i.site.replace(/^www\./, "") : "";
+  el.querySelector(".date").textContent = siteLabel(i.site);
   const meta = el.querySelector(".meta");
   if (![...meta.children].some((s) => s.textContent)) meta.remove();
   const t = el.querySelector(".title");
@@ -938,7 +953,7 @@ function card(i) {
   const fname = folderName(i.folder_id);
   if (folders.length || fname) {
     // フォルダを変えるのは、この表示を押す(カードの「フォルダ」ボタンは 2026-11-11 に外した)
-    ft.textContent = (fname ? `${fname}${i.folder_manual ? "" : " ✨"}` : "フォルダなし") + " ▾";
+    ft.textContent = (fname ? `${fname}${i.folder_manual ? "" : " ✨"}` : "フォルダなし") + " ›";
     ft.title = fname && !i.folder_manual ? "自動で選んだフォルダ" : "";
     if (fname) ft.classList.add("set");
     ft.onclick = () => openMove(i);

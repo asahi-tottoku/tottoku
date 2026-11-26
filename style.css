@@ -18,7 +18,7 @@
   --k0: #ffe3d6; --ki0: #8a3a12; --k1: #d8f3e3; --ki1: #17603c; --k2: #dbe5ff; --ki2: #2740b8;
   --k3: #fff0c7; --ki3: #7a5200; --k4: #eceefa; --ki4: #3a3f6b;
   --field-line: #b4b9dc; --card-bg: var(--surface);
-  --memo-badge: #e8437f; --memo-badge-ink: #ffffff; --danger: #c92a2a;
+  --memo-badge: #d6336c; --memo-badge-ink: #ffffff; --danger: #c92a2a;
   --round: "Zen Maru Gothic", system-ui, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
   --mono: "DM Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
   color-scheme: light;
@@ -188,6 +188,8 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
   transition: transform .18s ease, box-shadow .18s ease, opacity .18s;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
+/* 「3 はこ / 7 件」は日本語なので等幅にしない */
+#boxStat { font-family: inherit; letter-spacing: .02em; font-size: 12px; color: var(--soft); }
 .box-no { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--muted); font-weight: 500; }
 .box-name { font-size: 22px; font-weight: 900; margin-top: 6px; line-height: 1.3; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .box-sub { font-size: 12px; font-weight: 500; line-height: 1.5; color: var(--muted); margin-top: 4px; padding-right: 44px;
@@ -287,7 +289,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
   background: linear-gradient(transparent, rgba(0,0,0,.62)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 .thumb-cap.long { font-size: 10.5px; letter-spacing: -.02em; }
 .body { flex: 1; min-width: 0; }
-.meta { display: flex; gap: 6px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--muted); }
+.meta { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .dist { color: var(--accent); font-weight: 700; }
 .tagrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0 2px; }
 .tagrow .meta { margin-left: 2px; }
@@ -297,7 +299,8 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .folder-tag.set { color: var(--i-all); background: var(--t-all); }
 .area-tag { background: none; color: var(--muted); border: 1px dashed var(--line); }
 .area-tag.set { background: var(--t1); color: var(--i1); border-color: transparent; }
-.title { display: block; font-size: 17px; font-weight: 900; line-height: 1.35; margin: 2px 0 0; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+/* 押せる高さを 44px 近くに(見た目の位置は前と同じ。2026-11-26 デザインチェック) */
+.title { display: block; font-size: 17px; font-weight: 900; line-height: 1.35; margin: -8px 0 -10px; padding: 10px 0; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
 .title:hover { text-decoration: underline; }
 .summary { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .summary:empty, .who:empty { display: none; }
@@ -394,7 +397,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .memo-card.m-1 { --dot: #1f9d63; --mg: var(--g0); }
 .memo-card.m-2 { --dot: #3d5bf5; --mg: var(--g2); }
 .memo-card.m-3 { --dot: #d18a00; --mg: var(--g3); }
-.memo-date { display: flex; align-items: center; gap: 6px; margin: 0; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--muted); }
+.memo-date { display: flex; align-items: center; gap: 6px; margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--soft); }
 .memo-date .dot { width: 8px; height: 8px; border-radius: 4px; background: var(--dot); }
 .memo-text { margin: 8px 0 0; font-size: 14px; font-weight: 700; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .memo-sub { margin: 4px 0 0; font-size: 12px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -417,7 +420,7 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .sheet-new { width: 100%; margin-top: 10px; color: var(--accent); border: 2px dashed color-mix(in srgb, var(--accent) 40%, var(--line)); background: none; border-radius: 16px; }
 .sheet-cancel { width: 100%; margin-top: 8px; color: var(--muted); border: none; background: var(--chip); border-radius: 16px; min-height: 44px; }
 .actions .act-share { display: inline-grid; place-items: center; padding: 0 6px; min-width: 44px; }
-.sheet-share { width: 100%; margin-top: 8px; color: var(--accent); background: none; border: 1.5px solid var(--field-line); border-radius: 16px; min-height: 44px; font-weight: 700; }
+.sheet-share { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; color: var(--accent); background: none; border: 1.5px solid var(--field-line); border-radius: 16px; min-height: 44px; font-weight: 700; }
 .sheet-ok { width: 100%; margin-top: 14px; background: var(--accent); color: var(--on-accent); border: none; border-radius: 16px; min-height: 44px; }
 .field { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 textarea.field { resize: vertical; }
@@ -425,7 +428,9 @@ textarea.field { resize: vertical; }
 #noteInput { resize: none; min-height: 5.6em; max-height: 40vh; field-sizing: content; }
 .note-who { display: block; margin-top: 8px; padding: 6px 0; border: none; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; }
 .note-who[hidden] { display: none; }
-.note-folder { display: block; text-align: left; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-folder { display: block; text-align: left; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-right: 36px; position: relative; }
+.note-folder::after { content: "›"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--muted); }
 .field:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .sheet label.set-label { display: block; }
 .who-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
