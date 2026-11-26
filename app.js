@@ -484,23 +484,22 @@ function openNote(item) {
   $("#noteName").textContent = item.title;
   $("#titleInput").value = item.title || "";
   $("#areaInput").value = item.area || "";
-  $("#whoInput").value = item.recommender || "";
-  $("#noteInput").value = item.note || "";
-  const names = [...new Set(items.map((i) => i.recommender).filter(Boolean))].slice(0, 12);
-  const box = $("#whoChips");
-  box.innerHTML = "";
-  names.forEach((n) => {
-    const b = document.createElement("button");
-    b.className = "chip"; b.textContent = n;
-    b.onclick = () => { $("#whoInput").value = n; };
-    box.appendChild(b);
-  });
+  // 「教えてくれた人」の欄は外し、フォルダを変えるボタンにした(2026-11-26 きよさん)。入っていた人の名前はデータに残す
+  const fname = folderName(item.folder_id);
+  $("#noteFolder").textContent = `📁 ${fname || "フォルダなし"}${fname && !item.folder_manual ? "(自動)" : ""} ▾`;
+  const edits = () => ({ title: $("#titleInput").value.trim() || item.title, area: $("#areaInput").value.trim(),
+    note: $("#noteInput").value.trim() });
+  // フォルダを選ぶ画面へ。ここまでに書いた名前・地域・メモは先に保存する
+  $("#noteFolder").onclick = async () => {
+    await api(`/api/items/${item.id}`, { method: "PATCH", body: edits() });
+    dlg.close();
+    openMove({ ...item, ...edits() });
+  };
   // 送る: 編集の画面の中から(カードの「送る」はここにまとめた)
   $("#noteShare").onclick = () => { dlg.close(); shareItem(item); };
   $("#noteSave").onclick = async () => {
     await api(`/api/items/${item.id}`, { method: "PATCH",
-      body: { title: $("#titleInput").value.trim() || item.title, area: $("#areaInput").value.trim(),
-        recommender: $("#whoInput").value.trim(), note: $("#noteInput").value.trim() } });
+      body: edits() });
     dlg.close(); load();
   };
   dlg.showModal();
@@ -638,11 +637,16 @@ function genreOf(i) {
 }
 // 場所(お店・お出かけ先)かどうか。サイト・動画・買い物などは false(決め方は localdb.js)
 const isPlace = LocalAPI.isPlace;
+// いくつかのジャンルに当たったら、細かいほう(「割烹 鰻の…」は和食とうなぎ → うなぎ)。親は Sorter.GENRES の2つ目
+const finestGenre = (list) => {
+  const parents = new Set(list.map((g) => (Sorter.GENRES[g] || [])[1]).filter(Boolean));
+  return list.find((g) => !parents.has(g)) || list[0];
+};
 function genreOf0(i) {
   if (!isPlace(i)) return "その他";
-  const t = (i.tags || []).find((g) => GENRE_NAMES.has(g));
+  const t = finestGenre((i.tags || []).filter((g) => GENRE_NAMES.has(g)));
   if (t) return t;
-  const d = Sorter.detectGenres([i.title, ...(i.tags || []), i.summary, i.description].join(" "))[0];
+  const d = finestGenre(Sorter.detectGenres([i.title, ...(i.tags || []), i.summary, i.description].join(" ")));
   if (d) return d;
   const fg = Sorter.detectGenres(folderName(i.folder_id) || "");   // 「イタリアン」フォルダに入れたなら、イタリアン
   return fg.length === 1 ? fg[0] : "その他";

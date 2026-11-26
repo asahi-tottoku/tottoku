@@ -415,6 +415,9 @@ form.add .go { flex: none; height: 40px; padding: 0 20px; border-radius: 20px; f
 .sheet-ok { width: 100%; margin-top: 14px; background: var(--accent); color: var(--on-accent); border: none; border-radius: 16px; min-height: 44px; }
 .field { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 textarea.field { resize: vertical; }
+/* 編集のメモ: つまみで縮めて見切れないよう、高さは書いた量に合わせる(最低3行) */
+#noteInput { resize: none; min-height: 5.6em; max-height: 40vh; field-sizing: content; }
+.note-folder { display: block; text-align: left; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .field:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .sheet label.set-label { display: block; }
 .who-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
