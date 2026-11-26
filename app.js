@@ -885,7 +885,7 @@ function render() {
   const grid = gridMode(), searching = grid && !!filterQ();
   $("#boxHome").hidden = !grid || searching;
   $("#listArea").hidden = grid && !searching;
-  if (grid && !searching) { renderBoxes(); renderSearchNote([]); return; }
+  if (grid && !searching) { shownKey = ""; renderBoxes(); renderSearchNote([]); return; }   // 箱の並びに戻ったら、次の一覧は60枚から
   renderFolders();
   fixFilters();
   renderAreas();
@@ -899,6 +899,7 @@ function render() {
   ul.innerHTML = "";
   $("#mapBox").hidden = view !== "map";
   ul.hidden = view === "map";
+  if (moreObs) { moreObs.disconnect(); moreObs = null; }   // 前の一覧の「続き」の見張りを外す(地図に切り替えたときも)
   if (view === "map") renderMap(list);
   else renderCards(ul, list);
   renderSearchNote(list);
@@ -931,7 +932,8 @@ function renderCards(ul, list) {
     s.appendChild(b);
     ul.appendChild(s);
     if ("IntersectionObserver" in window) {
-      moreObs = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) b.onclick(); }, { rootMargin: "600px 0px" });
+      // 描き直しで外れた古い目印からの知らせは無視する
+      moreObs = new IntersectionObserver((es) => { if (s.isConnected && es.some((e) => e.isIntersecting)) b.onclick(); }, { rootMargin: "600px 0px" });
       moreObs.observe(s);
     }
   };
