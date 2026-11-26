@@ -98,16 +98,19 @@ function fillBoxSelect(sel, cur) {
   add("", "箱に入れない(「すべて」だけに出る)");
   sel.value = cur == null ? "" : String(cur);
 }
+// 箱を移ったときの知らせ
+const movedMsg = (box, folder) => (box == null ? "箱の外に移しました(「すべて」に出ます)" : `箱「${boxName(box)}」${folder ? `の「${folder}」` : ""}に移しました`);
 const selBox = (sel) => (sel.value === "" ? null : Number(sel.value));
 
 // 新しいフォルダを作る。名前と「入れる箱」を聞く(2026-11-26 きよさん「作ったフォルダがどこにも出てこない」。
 // 箱の外で作ると、どの箱にも入らず箱の並びから見えなかった)。箱の中で作るときは、その箱を選んだ状態で開く。
 // 箱の外で作るときは、先頭の箱を選んだ状態(箱に入れないも選べる)。箱が1つも無ければ箱の欄は出さない
-function createFolder() {
+// defBox: はじめに選んでおく箱(お店のフォルダを選ぶ画面から作るときは、そのお店の箱)
+function createFolder(defBox) {
   const dlg = $("#newFolderDlg"), input = $("#newFolderName"), sel = $("#newFolderBox");
   input.value = "";
   $("#newFolderBoxRow").hidden = !boxes.length;
-  fillBoxSelect(sel, inBoxView() ? activeBox : boxes.length ? boxes[0].id : null);
+  fillBoxSelect(sel, defBox !== undefined ? defBox : inBoxView() ? activeBox : boxes.length ? boxes[0].id : null);
   return new Promise((resolve) => {
     let id = null, busy = false;
     const ok = async () => {
@@ -489,23 +492,29 @@ function openMove(item, ask = false) {
       dlg.close();
       // 「フォルダなし」を選んだら、今いる箱の「フォルダなし」に置く(箱の外・すべてにいるときは、今の箱のまま)
       const body = { folder: value };
-      if (value === null) body.box = inBoxView() ? activeBox : boxOf(item);
+      if (value === null) body.box = home;
       await api(`/api/items/${item.id}`, { method: "PATCH", body });
-      toast(value === "auto" ? "自動で選びました" : "移動しました");
-      load();
+      await load();
+      // 今いる箱から出たら、どこへ行ったかを知らせる(一覧から消えて見失わないように)
+      const now = items.find((x) => x.id === item.id);
+      toast(now && inBoxView() && boxOf(now) !== activeBox ? movedMsg(boxOf(now), folderName(now.folder_id))
+        : value === "auto" ? "自動で選びました" : "移動しました");
     };
     list.appendChild(b);
   };
   if (!ask) opt("🗂 自動で選ぶ", "auto", !item.folder_manual, "地名とジャンルで選びます");
-  // 今いる箱のフォルダを先に。ほかの箱のフォルダには箱の名前を添える(選ぶと、お店もその箱へ移る)
-  const here = boxFolders(), others = folders.filter((f) => !here.includes(f));
+  // お店の箱のフォルダを先に。ほかの箱のフォルダには箱の名前を添える(選ぶと、お店もその箱へ移る)。
+  // 前は「今いる箱」を先にしていたので、編集で箱を変えてからフォルダを選ぶと、元の箱のフォルダが並び、
+  // 「フォルダなし」を選ぶと元の箱に戻っていた(2026-11-26 きよさん「箱とフォルダを変えようとすると変えられなくなる」)
+  const home = boxes.length ? boxOf(item) : null;
+  const here = boxes.length ? folders.filter((f) => (f.box_id ?? null) === home) : folders, others = folders.filter((f) => !here.includes(f));
   here.forEach((f) => opt("📁 " + f.name, f.id, item.folder_manual && item.folder_id === f.id));
   others.forEach((f) => opt("📁 " + f.name, f.id, item.folder_manual && item.folder_id === f.id,
     escapeHtml(f.box_id != null ? `箱「${boxName(f.box_id)}」` : "箱の外")));
   opt("フォルダなし", null, item.folder_manual && !folderName(item.folder_id));
   $("#moveNew").onclick = async () => {
     dlg.close();
-    const id = await createFolder();
+    const id = await createFolder(home);
     if (!id) return;
     await api(`/api/items/${item.id}`, { method: "PATCH", body: { folder: id } });
     load();
@@ -569,9 +578,10 @@ function openNote(item) {
   $("#noteShare").onclick = () => { dlg.close(); shareItem(item); };
   $("#noteDelete").onclick = () => { dlg.close(); deleteItem(item); };
   $("#noteSave").onclick = async () => {
-    await api(`/api/items/${item.id}`, { method: "PATCH",
-      body: edits() });
+    const e = edits();
+    await api(`/api/items/${item.id}`, { method: "PATCH", body: e });
     dlg.close(); load();
+    if ("box" in e) toast(movedMsg(e.box));
   };
   dlg.showModal();
 }
