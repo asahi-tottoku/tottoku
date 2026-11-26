@@ -867,9 +867,11 @@ function card(i) {
   // 色: 箱に入っていれば箱のカードと同じ色(種類ごとだと同じ箱の中で色がばらばらになるため)。箱の外は種類ごとの色
   if (bname) th.classList.add("bt", "tint-" + tintOf(boxOf(i)));
   else th.classList.add("k-" + (KIND_TINT[i.category] ?? 4));
+  // 箱の中では、箱の名前は上の帯と同じなので、ジャンル(スイーツ・ラーメン…)を出す(2026-11-26 デザインチェック)
+  const glabel = g !== "その他" ? (GENRE_LABEL[g] || g).split("・")[0] : i.category;
   const noimg = () => {
     th.classList.add("noimg");
-    th.textContent = bname || (g !== "その他" ? (GENRE_LABEL[g] || g).split("・")[0] : i.category);
+    th.textContent = (inBoxView() ? "" : bname) || glabel;
     if (th.textContent.length > 6) th.classList.add("long");
   };
   if (i.image) {
@@ -1014,7 +1016,6 @@ async function renderMap(list) {
 }
 
 // ---------------------------------------------------------------- 箱の画面(最初の画面の箱の並び・箱の中の見出し)
-const pad2 = (n) => String(n).padStart(2, "0");
 const shortName = (t) => { t = String(t || "").replace(/\s*\([^)]*\)\s*$/, ""); return t.length > 10 ? t.slice(0, 9) + "…" : t; };
 let moveMode = false;   // 箱の並べ替え中
 
@@ -1057,8 +1058,8 @@ function renderBoxes() {
     a.type = "button";
     a.className = `box-card tint-${c.key === "memo" ? 1 : tintOf(c.key)} sortable`;
     a.dataset.key = c.key;
-    a.innerHTML = `<span class="box-no"></span><span class="box-name"></span><span class="box-sub"></span><span class="box-n"></span>`;
-    a.querySelector(".box-no").textContent = `${pad2(n + 1)} / ${pad2(cards.length)}`;
+    // 「01 / 05」の番号は意味がないので出さない(2026-11-26 デザインチェック)
+    a.innerHTML = `<span class="box-name"></span><span class="box-sub"></span><span class="box-n"></span>`;
     a.querySelector(".box-name").textContent = c.name;
     // 説明: 「すべて」は決まった文、ほかは新しいもの2つの名前
     a.querySelector(".box-sub").textContent = c.key === "all" ? "箱の外のものも全部"
@@ -1462,7 +1463,7 @@ $("#noteCancel").onclick = () => $("#noteDlg").close();
 // ---------------------------------------------------------------- 設定(色・データ)
 const ACCENTS = [
   ["ai", "あお(既定)", "#3d5bf5"], ["orange", "オレンジ", "#e8590c"], ["red", "ローズ", "#d6336c"], ["pink", "ピンク", "#c2255c"],
-  ["purple", "むらさき", "#7048e8"], ["blue", "あお", "#1c7ed6"], ["teal", "みずいろ", "#0c8599"],
+  ["purple", "むらさき", "#7048e8"], ["blue", "そらいろ", "#1c7ed6"], ["teal", "みずいろ", "#0c8599"],
   ["green", "みどり", "#2b8a3e"], ["brown", "ちゃいろ", "#9c6644"], ["gray", "グレー", "#495057"],
 ];
 
